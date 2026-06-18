@@ -1,6 +1,15 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+console.log('MONGODB_URI exists:', !!process.env.MONGODB_URI);
+
+export const config = {
+  token: process.env.DISCORD_TOKEN,
+  clientId: process.env.DISCORD_CLIENT_ID,
+  guildId: process.env.DISCORD_GUILD_ID,
+  mongoUri: process.env.MONGODB_URI,
+  // ...
+};
 export const config = {
   token: process.env.DISCORD_TOKEN,
   clientId: process.env.DISCORD_CLIENT_ID,
