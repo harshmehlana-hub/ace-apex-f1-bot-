@@ -11,6 +11,7 @@ import resultsCommand from './commands/results.js';
 import recalculateresultsCommand from './commands/recalculateresults.js';
 import deleteraceCommand from './commands/deleterace.js';
 import resetseasonCommand from './commands/resetseason.js';
+import adjustpointsCommand from './commands/adjustpoints.js';
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -22,6 +23,7 @@ const commands = [
   recalculateresultsCommand.data.toJSON(),
   deleteraceCommand.data.toJSON(),
   resetseasonCommand.data.toJSON(),
+ adjustpointsCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);

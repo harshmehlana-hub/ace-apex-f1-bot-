@@ -13,6 +13,7 @@ import resultsCommand from './commands/results.js';
 import recalculateresultsCommand from './commands/recalculateresults.js';
 import deleteraceCommand from './commands/deleterace.js';
 import resetseasonCommand from './commands/resetseason.js';
+import adjustpointsCommand from './commands/adjustpoints.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -39,6 +40,7 @@ const commands = [
   recalculateresultsCommand,
   deleteraceCommand,
   resetseasonCommand,
+  adjustpointsCommand,
 ];
 
 for (const command of commands) {
