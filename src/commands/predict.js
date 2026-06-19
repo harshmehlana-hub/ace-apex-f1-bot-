@@ -56,6 +56,7 @@ export default {
       });
 
       const raceId = raceInteraction.values[0];
+      const race = await Race.findById(raceId);
 
       const existingPrediction = await Prediction.findOne({
         userId: interaction.user.id,
