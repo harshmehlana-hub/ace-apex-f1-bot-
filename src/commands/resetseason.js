@@ -9,9 +9,13 @@ import {
 import { Race } from '../database/models/Race.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { Result } from '../database/models/Result.js';
+import { Qualifying } from '../database/models/Qualifying.js';
+import { QualifyingPrediction } from '../database/models/QualifyingPrediction.js';
+import { QualifyingResult } from '../database/models/QualifyingResult.js';
 import { User } from '../database/models/User.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+
 
 export default {
   data: new SlashCommandBuilder()

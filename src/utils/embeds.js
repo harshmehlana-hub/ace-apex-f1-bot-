@@ -76,3 +76,51 @@ export function createRaceAnnouncementEmbed(race) {
     )
     .setTimestamp();
 }
+
+export function createQualifyingResultsEmbed(
+  qualifying,
+  result,
+  correctPredictions,
+  totalPredictions
+) {
+  return new EmbedBuilder()
+    .setColor(0xE10600)
+    .setTitle(`🏁 ${qualifying.name} Results`)
+    .addFields(
+      {
+        name: '🏆 Pole Position',
+        value: result.poleDriver,
+        inline: false,
+      },
+      {
+        name: '🎯 Correct Predictions',
+        value: `${correctPredictions}`,
+        inline: true,
+      },
+      {
+        name: '📊 Total Predictions',
+        value: `${totalPredictions}`,
+        inline: true,
+      },
+      {
+        name: '⭐ Points Awarded',
+        value: '5 Points',
+        inline: true,
+      }
+    )
+    .setTimestamp();
+}
+
+export function createQualifyingAnnouncementEmbed(qualifying) {
+  return new EmbedBuilder()
+    .setColor(0x0099FF)
+    .setTitle(`🏁 QUALIFYING PREDICTIONS OPEN : ${qualifying.name}`)
+    .setDescription(
+      `Predictions are now open for **${qualifying.name}**!\n\n` +
+      `Use \`/predictqualifying\` to predict Pole Position.\n\n` +
+      `⏰ **Deadline:** <t:${Math.floor(
+        qualifying.predictionCloseTime.getTime() / 1000
+      )}:F>`
+    )
+    .setTimestamp();
+}

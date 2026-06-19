@@ -13,6 +13,9 @@ import deleteraceCommand from './commands/deleterace.js';
 import resetseasonCommand from './commands/resetseason.js';
 import adjustpointsCommand from './commands/adjustpoints.js';
 import setqualifyingCommand from './commands/setqualifying.js';
+import predictqualifyingCommand from './commands/predictqualifying.js';
+import qualifyingresultCommand from './commands/qualifyingresult.js';
+import deletequalifyingCommand from './commands/deletequalifying.js';
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -26,6 +29,9 @@ const commands = [
   resetseasonCommand.data.toJSON(),
  adjustpointsCommand.data.toJSON(),
 setqualifyingCommand.data.toJSON(),
+predictqualifyingCommand.data.toJSON(),
+qualifyingresultCommand.data.toJSON(),
+deletequalifyingCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);

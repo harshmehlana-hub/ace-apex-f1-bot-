@@ -23,6 +23,10 @@ const qualifyingSchema = new mongoose.Schema({
     enum: ['upcoming', 'open', 'closed', 'completed'],
     default: 'upcoming',
   },
+announcementSent: {
+  type: Boolean,
+  default: false,
+},
 }, {
   timestamps: true,
 });

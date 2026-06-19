@@ -15,6 +15,9 @@ import deleteraceCommand from './commands/deleterace.js';
 import resetseasonCommand from './commands/resetseason.js';
 import adjustpointsCommand from './commands/adjustpoints.js';
 import setqualifyingCommand from './commands/setqualifying.js';
+import predictqualifyingCommand from './commands/predictqualifying.js';
+import qualifyingresultCommand from './commands/qualifyingresult.js';
+import deletequalifyingCommand from './commands/deletequalifying.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -43,6 +46,9 @@ const commands = [
   resetseasonCommand,
   adjustpointsCommand,
  setqualifyingCommand,
+predictqualifyingCommand,
+qualifyingresultCommand,
+deletequalifyingCommand,
 ];
 
 for (const command of commands) {
