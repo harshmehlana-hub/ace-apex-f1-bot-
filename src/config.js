@@ -27,4 +27,9 @@ export const config = {
     1: 15,  // 1 correct position
     0: 0,   // 0 correct positions
   },
+
+ qualifyingScoring: {
+  correct: 5,
+  incorrect: 0,
+},
 };
