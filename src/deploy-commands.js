@@ -32,9 +32,9 @@ async function deployCommands() {
     
     // Deploy to specific guild (faster for development)
     await rest.put(
-      Routes.applicationGuildCommands(config.clientId, config.guildId),
-      { body: commands }
-    );
+  Routes.applicationGuildCommands(config.clientId, config.guildId),
+  { body: commands }
+);
     
     console.log('✅ Commands deployed successfully!');
   } catch (error) {

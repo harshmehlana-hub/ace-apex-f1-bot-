@@ -52,9 +52,10 @@ client.on('interactionCreate', (interaction) => interactionCreateEvent.execute(i
 // Start the bot
 async function main() {
   try {
+    console.log("MONGODB_URI:", process.env.MONGODB_URI ? "FOUND" : "NOT FOUND");
+
     await connectDatabase();
-    console.log('Connected to MongoDB');
-    
+    console.log('Connected to MongoDB');    
     await client.login(config.token);
     
     // Setup scheduler after client is ready

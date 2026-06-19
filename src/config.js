@@ -1,8 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-console.log('MONGODB_URI exists:', !!process.env.MONGODB_URI);
-
 export const config = {
   token: process.env.DISCORD_TOKEN,
   clientId: process.env.DISCORD_CLIENT_ID,
@@ -17,14 +15,16 @@ export const config = {
     predictor: process.env.PREDICTOR_ROLE_ID,
     admin: process.env.ADMIN_ROLE_ID,
   },
+  // Prediction window timing (in milliseconds)
   timing: {
-    openBefore: 24 * 60 * 60 * 1000,
-    closeBefore: 10 * 60 * 1000,
+    openBefore: 24 * 60 * 60 * 1000,  // 24 hours before race
+    closeBefore: 10 * 60 * 1000,       // 10 minutes before race
   },
+  // Scoring table
   scoring: {
-    3: 25,
-    2: 18,
-    1: 15,
-    0: 0,
+    3: 25,  // 3 correct positions
+    2: 18,  // 2 correct positions
+    1: 15,  // 1 correct position
+    0: 0,   // 0 correct positions
   },
 };
