@@ -124,3 +124,44 @@ export function createQualifyingAnnouncementEmbed(qualifying) {
     )
     .setTimestamp();
 }
+
+export function createPredictionStatisticsEmbed(
+  race,
+  totalPredictions,
+  p1Driver,
+  p1Votes,
+  p1Percent,
+  p2Driver,
+  p2Votes,
+  p2Percent,
+  p3Driver,
+  p3Votes,
+  p3Percent
+) {
+  return new EmbedBuilder()
+    .setColor(0xE10600)
+    .setTitle(`📊 ${race.name} Prediction Statistics`)
+    .addFields(
+      {
+        name: '📊 Total Predictions',
+        value: `${totalPredictions}`,
+        inline: false,
+      },
+      {
+        name: '🥇 Most Selected P1',
+        value: `${p1Driver}\n${p1Votes} votes (${p1Percent}%)`,
+        inline: false,
+      },
+      {
+        name: '🥈 Most Selected P2',
+        value: `${p2Driver}\n${p2Votes} votes (${p2Percent}%)`,
+        inline: false,
+      },
+      {
+        name: '🥉 Most Selected P3',
+        value: `${p3Driver}\n${p3Votes} votes (${p3Percent}%)`,
+        inline: false,
+      }
+    )
+    .setTimestamp();
+}

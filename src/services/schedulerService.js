@@ -5,7 +5,9 @@ import { config } from '../config.js';
 import {
   createRaceAnnouncementEmbed,
   createQualifyingAnnouncementEmbed,
+  createPredictionStatisticsEmbed,
 } from '../utils/embeds.js';
+import { Prediction } from '../database/models/Prediction.js';
 
 export function setupScheduler(client) {
   // Run every minute
@@ -45,6 +47,7 @@ async function updateRaceStatuses(client) {
   });
 
   for (const race of racesToClose) {
+await sendPredictionStatistics(client, race);
     race.status = 'closed';
     await race.save();
   }
@@ -134,6 +137,74 @@ async function sendQualifyingOpenAnnouncement(
   } catch (error) {
     console.error(
       'Failed to send qualifying announcement:',
+      error
+    );
+  }
+}
+
+async function sendPredictionStatistics(client, race) {
+  try {
+    const predictions = await Prediction.find({
+      raceId: race._id,
+    });
+
+    if (predictions.length === 0) return;
+
+    const totalPredictions = predictions.length;
+
+    const p1Counts = {};
+    const p2Counts = {};
+    const p3Counts = {};
+
+    for (const prediction of predictions) {
+      p1Counts[prediction.p1Driver] =
+        (p1Counts[prediction.p1Driver] || 0) + 1;
+
+      p2Counts[prediction.p2Driver] =
+        (p2Counts[prediction.p2Driver] || 0) + 1;
+
+      p3Counts[prediction.p3Driver] =
+        (p3Counts[prediction.p3Driver] || 0) + 1;
+    }
+
+    const topP1 = Object.entries(p1Counts)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    const topP2 = Object.entries(p2Counts)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    const topP3 = Object.entries(p3Counts)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    const channel = await client.channels.fetch(
+      config.channels.statistics
+    );
+
+    if (!channel) return;
+
+    const embed = createPredictionStatisticsEmbed(
+      race,
+      totalPredictions,
+
+      topP1[0],
+      topP1[1],
+      ((topP1[1] / totalPredictions) * 100).toFixed(1),
+
+      topP2[0],
+      topP2[1],
+      ((topP2[1] / totalPredictions) * 100).toFixed(1),
+
+      topP3[0],
+      topP3[1],
+      ((topP3[1] / totalPredictions) * 100).toFixed(1)
+    );
+
+    await channel.send({
+      embeds: [embed],
+    });
+  } catch (error) {
+    console.error(
+      'Failed to send prediction statistics:',
       error
     );
   }

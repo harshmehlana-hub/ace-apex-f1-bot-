@@ -7,10 +7,11 @@ export const config = {
   guildId: process.env.DISCORD_GUILD_ID,
   mongoUri: process.env.MONGODB_URI,
   channels: {
-    announcements: process.env.ANNOUNCEMENT_CHANNEL_ID,
-    logs: process.env.LOGS_CHANNEL_ID,
-    results: process.env.RESULTS_CHANNEL_ID,
-  },
+  announcements: process.env.ANNOUNCEMENT_CHANNEL_ID,
+  logs: process.env.LOGS_CHANNEL_ID,
+  results: process.env.RESULTS_CHANNEL_ID,
+  statistics: process.env.STATISTICS_CHANNEL_ID,
+},
   roles: {
     predictor: process.env.PREDICTOR_ROLE_ID,
     admin: process.env.ADMIN_ROLE_ID,
