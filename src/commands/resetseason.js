@@ -46,8 +46,11 @@ export default {
       content: '⚠️ **DANGER: Season Reset**\n\n' +
         'This will **permanently delete**:\n' +
         '• All races\n' +
-        '• All predictions\n' +
-        '• All results\n' +
+        '• All race predictions\n' +
+        '• All race results\n' +
+        '• All qualifying sessions\n' +
+        '• All qualifying predictions\n' +
+        '• All qualifying results\n' +
         '• All user points and rankings\n' +
         '• All perfect prediction counts\n\n' +
         '**This action cannot be undone!**\n\n' +
@@ -99,18 +102,26 @@ export default {
       }
       
       // Perform reset
-      await Prediction.deleteMany({});
-      await Result.deleteMany({});
-      await Race.deleteMany({});
-      await User.updateMany({}, {
-        totalPoints: 0,
-        perfectPredictions: 0,
-        pointsReachedAt: new Date(),
-      });
-      
+// Perform reset
+await Prediction.deleteMany({});
+await Result.deleteMany({});
+await Race.deleteMany({});
+
+await QualifyingPrediction.deleteMany({});
+await QualifyingResult.deleteMany({});
+await Qualifying.deleteMany({});
+
+await User.updateMany(
+  {},
+  {
+    totalPoints: 0,
+    perfectPredictions: 0,
+    pointsReachedAt: new Date(),
+  }
+);      
       await finalInteraction.update({
         content: '✅ **Season has been reset.**\n\n' +
-          'All races, predictions, results, and scores have been cleared.\n' +
+          'All races, qualifying, predictions, results, and scores have been cleared.\n' +
           'User accounts have been preserved with zero points.',
         components: [],
       });

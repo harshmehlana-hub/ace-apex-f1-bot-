@@ -9,7 +9,7 @@ export const F1_DRIVERS = [
   'Charles Leclerc',
 
   'George Russell',
-  'Andrea Kimi Antonelli',
+  'Kimi Antonelli',
 
   'Pierre Gasly',
   'Franco Colapinto',
