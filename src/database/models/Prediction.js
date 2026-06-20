@@ -6,12 +6,17 @@ const predictionSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+season: {
+  type: String,
+  required: true,
+},
   raceId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Race',
     required: true,
     index: true,
   },
+
   p1Driver: {
     type: String,
     required: true,

@@ -12,6 +12,7 @@ export const config = {
   results: process.env.RESULTS_CHANNEL_ID,
   statistics: process.env.STATISTICS_CHANNEL_ID,
 },
+season: process.env.CURRENT_SEASON,
   roles: {
     predictor: process.env.PREDICTOR_ROLE_ID,
     admin: process.env.ADMIN_ROLE_ID,

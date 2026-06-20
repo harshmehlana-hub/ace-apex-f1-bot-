@@ -10,7 +10,7 @@ import { Qualifying } from '../database/models/Qualifying.js';
 import { QualifyingPrediction } from '../database/models/QualifyingPrediction.js';
 import { QualifyingResult } from '../database/models/QualifyingResult.js';
 import { User } from '../database/models/User.js';
-
+import { getOrCreateSeasonStanding } from '../services/seasonStandingService.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { createQualifyingResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
@@ -155,6 +155,20 @@ export default {
 
           await user.save();
         }
+const standing =
+  await getOrCreateSeasonStanding(
+    prediction.userId,
+    prediction.season
+  );
+
+standing.qualifyingPoints += points;
+standing.totalPoints += points;
+
+if (points > 0) {
+  standing.correctPolePredictions += 1;
+}
+
+await standing.save();
       }
 
       qualifying.status = 'completed';

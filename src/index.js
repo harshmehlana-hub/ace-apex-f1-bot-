@@ -1,7 +1,6 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js';
 import { config } from './config.js';
 import { connectDatabase } from './database/connection.js';
-import { setupScheduler } from './services/schedulerService.js';
 
 // Import commands
 import predictCommand from './commands/predict.js';
@@ -18,6 +17,8 @@ import setqualifyingCommand from './commands/setqualifying.js';
 import predictqualifyingCommand from './commands/predictqualifying.js';
 import qualifyingresultCommand from './commands/qualifyingresult.js';
 import deletequalifyingCommand from './commands/deletequalifying.js';
+import predictionstatsCommand from './commands/predictionstats.js';
+import remindCommand from './commands/remind.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -49,6 +50,8 @@ const commands = [
 predictqualifyingCommand,
 qualifyingresultCommand,
 deletequalifyingCommand,
+predictionstatsCommand,
+remindCommand,
 ];
 
 for (const command of commands) {
@@ -68,10 +71,7 @@ async function main() {
     console.log('Connected to MongoDB');    
     await client.login(config.token);
     
-    // Setup scheduler after client is ready
-    client.once('ready', () => {
-      setupScheduler(client);
-    });
+    
   } catch (error) {
     console.error('Failed to start bot:', error);
     process.exit(1);

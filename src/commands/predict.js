@@ -8,7 +8,7 @@ import {
 import { Race } from '../database/models/Race.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { User } from '../database/models/User.js';
-
+import { getOrCreateSeasonStanding } from '../services/seasonStandingService.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { validatePodiumSelection } from '../utils/validators.js';
 import { config } from '../config.js';
@@ -160,12 +160,21 @@ export default {
       await Prediction.create({
         userId: interaction.user.id,
         raceId,
+        season: race.season,
         p1Driver,
         p2Driver,
         p3Driver,
         submittedAt: new Date(),
       });
 
+const standing = await getOrCreateSeasonStanding(
+  interaction.user.id,
+  race.season
+);
+
+standing.racePredictionsSubmitted += 1;
+
+await standing.save();
       await User.findOneAndUpdate(
         { discordId: interaction.user.id },
         {

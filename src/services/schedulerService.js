@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { Race } from '../database/models/Race.js';
+import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { config } from '../config.js';
 import {
@@ -14,6 +15,7 @@ export function setupScheduler(client) {
   cron.schedule('* * * * *', async () => {
     await updateRaceStatuses(client);
     await updateQualifyingStatuses(client);
+    await processReminders(client);
   });
 
   console.log('Scheduler initialized');
@@ -207,5 +209,38 @@ async function sendPredictionStatistics(client, race) {
       'Failed to send prediction statistics:',
       error
     );
+  }
+}
+async function processReminders(client) {
+  const now = new Date();
+
+  const reminders = await Reminder.find({
+    sent: false,
+    remindAt: { $lte: now },
+  });
+
+  for (const reminder of reminders) {
+    try {
+      const channel = await client.channels.fetch(
+        reminder.channelId
+      );
+
+      if (channel) {
+        await channel.send({
+          content:
+            `<@${reminder.userId}>\n\n` +
+            `⚠️ **Reminder**\n\n` +
+            reminder.message,
+        });
+      }
+
+      reminder.sent = true;
+      await reminder.save();
+    } catch (error) {
+      console.error(
+        'Failed to send reminder:',
+        error
+      );
+    }
   }
 }

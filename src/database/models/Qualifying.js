@@ -6,6 +6,10 @@ const qualifyingSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+season: {
+  type: String,
+  required: true,
+},
   sessionStartTime: {
     type: Date,
     required: true,

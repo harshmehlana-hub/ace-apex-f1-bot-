@@ -86,6 +86,7 @@ const raceStartTime = new Date(
     
     const race = new Race({
       name,
+      season: config.season,
       raceStartTime,
       predictionOpenTime,
       predictionCloseTime,

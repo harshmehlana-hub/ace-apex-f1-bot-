@@ -9,6 +9,7 @@ import { QualifyingPrediction } from '../database/models/QualifyingPrediction.js
 import { User } from '../database/models/User.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { config } from '../config.js';
+import { getOrCreateSeasonStanding } from '../services/seasonStandingService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -115,11 +116,20 @@ export default {
       const prediction = new QualifyingPrediction({
         userId: interaction.user.id,
         qualifyingId,
+        season: selectedSession.season,
         predictedDriver,
         submittedAt: new Date(),
       });
 
       await prediction.save();
+const standing = await getOrCreateSeasonStanding(
+  interaction.user.id,
+  selectedSession.season
+);
+
+standing.qualifyingPredictionsSubmitted += 1;
+
+await standing.save();
 
       await User.findOneAndUpdate(
         { discordId: interaction.user.id },

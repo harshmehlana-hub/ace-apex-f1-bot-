@@ -1,3 +1,4 @@
+import { setupScheduler } from '../services/schedulerService.js';
 export default {
   name: 'ready',
   once: true,
@@ -6,5 +7,7 @@ export default {
     console.log(`📊 Serving ${client.guilds.cache.size} guild(s)`);
     
     client.user.setActivity('F1 Predictions', { type: 3 }); // Watching
+
+setupScheduler(client);
   },
 };

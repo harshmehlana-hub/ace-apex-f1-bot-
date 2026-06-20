@@ -165,3 +165,64 @@ export function createPredictionStatisticsEmbed(
     )
     .setTimestamp();
 }
+export function createPredictionStatsEmbed(
+  user,
+  season,
+  rank,
+  totalUsers,
+  standing,
+  p1Accuracy,
+  p2Accuracy,
+  p3Accuracy,
+  poleAccuracy
+) {
+  return new EmbedBuilder()
+    .setColor(0xE10600)
+    .setTitle(`🏎️ Prediction Statistics - ${season}`)
+    .addFields(
+      {
+        name: '👤 User',
+        value: user.username,
+        inline: true,
+      },
+      {
+        name: '🏆 Season Rank',
+        value: `#${rank} / ${totalUsers}`,
+        inline: true,
+      },
+      {
+        name: '\u200B',
+        value: '\u200B',
+        inline: true,
+      },
+
+      {
+        name: '📊 Points Breakdown',
+        value:
+          `🏁 Race Points: ${standing.racePoints}\n` +
+          `⚡ Qualifying Points: ${standing.qualifyingPoints}\n` +
+          `🎯 Total Points: ${standing.totalPoints}`,
+        inline: false,
+      },
+
+      {
+        name: '🎯 Accuracy',
+        value:
+          `🥇 P1 Accuracy: ${p1Accuracy}%\n` +
+          `🥈 P2 Accuracy: ${p2Accuracy}%\n` +
+          `🥉 P3 Accuracy: ${p3Accuracy}%\n` +
+          `🏆 Pole Accuracy: ${poleAccuracy}%`,
+        inline: false,
+      },
+
+      {
+        name: '🏅 Records',
+        value:
+          `🏆 Perfect Podiums: ${standing.perfectPodiums}\n` +
+          `🏎️ Race Predictions: ${standing.racePredictionsSubmitted}\n` +
+          `⚡ Qualifying Predictions: ${standing.qualifyingPredictionsSubmitted}`,
+        inline: false,
+      }
+    )
+    .setTimestamp();
+}

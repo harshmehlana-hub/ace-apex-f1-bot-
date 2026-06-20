@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { User } from '../database/models/User.js';
+import { getOrCreateSeasonStanding } from './seasonStandingService.js';
 
 export function calculateScore(prediction, result) {
   let correctPositions = 0;
@@ -37,6 +38,32 @@ export async function processRaceResults(raceId, result) {
       }
       await user.save();
     }
+
+const standing = await getOrCreateSeasonStanding(
+  prediction.userId,
+  prediction.season
+);
+
+standing.racePoints += points;
+standing.totalPoints += points;
+
+if (prediction.p1Driver === result.p1Driver) {
+  standing.correctP1Predictions += 1;
+}
+
+if (prediction.p2Driver === result.p2Driver) {
+  standing.correctP2Predictions += 1;
+}
+
+if (prediction.p3Driver === result.p3Driver) {
+  standing.correctP3Predictions += 1;
+}
+
+if (isPerfect) {
+  standing.perfectPodiums += 1;
+}
+
+await standing.save();
     
     scores.push({
       userId: prediction.userId,
@@ -78,5 +105,42 @@ export async function recalculateRaceScores(raceId, oldResult, newResult) {
       user.pointsReachedAt = new Date();
       await user.save();
     }
-  }
+
+const standing = await getOrCreateSeasonStanding(
+  prediction.userId,
+  prediction.season
+);
+
+standing.racePoints += pointDiff;
+standing.totalPoints += pointDiff;
+standing.perfectPodiums += perfectDiff;
+
+// Remove old accuracy counts
+if (prediction.p1Driver === oldResult.p1Driver) {
+  standing.correctP1Predictions -= 1;
+}
+
+if (prediction.p2Driver === oldResult.p2Driver) {
+  standing.correctP2Predictions -= 1;
+}
+
+if (prediction.p3Driver === oldResult.p3Driver) {
+  standing.correctP3Predictions -= 1;
+}
+
+// Apply new accuracy counts
+if (prediction.p1Driver === newResult.p1Driver) {
+  standing.correctP1Predictions += 1;
+}
+
+if (prediction.p2Driver === newResult.p2Driver) {
+  standing.correctP2Predictions += 1;
+}
+
+if (prediction.p3Driver === newResult.p3Driver) {
+  standing.correctP3Predictions += 1;
+}
+
+await standing.save();
+ }
 }

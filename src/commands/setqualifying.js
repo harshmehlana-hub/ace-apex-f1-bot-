@@ -81,6 +81,7 @@ export default {
 
     const qualifying = new Qualifying({
       name,
+      season: config.season,
       sessionStartTime,
       predictionOpenTime,
       predictionCloseTime,

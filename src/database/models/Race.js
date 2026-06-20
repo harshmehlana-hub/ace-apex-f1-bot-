@@ -9,6 +9,10 @@ const raceSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+season: {
+  type: String,
+  required: true,
+},
   predictionOpenTime: {
     type: Date,
     required: true,

@@ -12,6 +12,10 @@ const qualifyingPredictionSchema = new mongoose.Schema({
     required: true,
     index: true,
   },
+season: {
+  type: String,
+  required: true,
+},
   predictedDriver: {
     type: String,
     required: true,
