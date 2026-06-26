@@ -105,7 +105,7 @@ async function sendPredictionOpenAnnouncement(
     const embed = createRaceAnnouncementEmbed(race);
 
     await channel.send({
-      content: '@everyone',
+      content: '@everyone 🏁 Race Predictions are now LIVE!',
       embeds: [embed],
     });
   } catch (error) {
@@ -133,7 +133,7 @@ async function sendQualifyingOpenAnnouncement(
       );
 
     await channel.send({
-      content: '@everyone',
+      content: '@everyone 🏁 Qualifying Predictions are now LIVE!',
       embeds: [embed],
     });
   } catch (error) {
