@@ -18,6 +18,7 @@ import qualifyingresultCommand from './commands/qualifyingresult.js';
 import deletequalifyingCommand from './commands/deletequalifying.js';
 import predictionstatsCommand from './commands/predictionstats.js';
 import remindCommand from './commands/remind.js';
+import announcementCommand from './commands/announcement.js';
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -36,6 +37,7 @@ qualifyingresultCommand.data.toJSON(),
 deletequalifyingCommand.data.toJSON(),
 predictionstatsCommand.data.toJSON(),
 remindCommand.data.toJSON(),
+announcementCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);

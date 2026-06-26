@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
+import { Announcement } from '../database/models/Announcement.js';
 import { config } from '../config.js';
 import {
   createRaceAnnouncementEmbed,
@@ -16,6 +17,7 @@ export function setupScheduler(client) {
     await updateRaceStatuses(client);
     await updateQualifyingStatuses(client);
     await processReminders(client);
+    await processAnnouncements(client);
   });
 
   console.log('Scheduler initialized');
@@ -239,6 +241,78 @@ async function processReminders(client) {
     } catch (error) {
       console.error(
         'Failed to send reminder:',
+        error
+      );
+    }
+  }
+}
+async function processAnnouncements(client) {
+  const now = new Date();
+
+  const announcements = await Announcement.find({
+    nextAnnouncementAt: { $lte: now },
+  });
+
+  for (const announcement of announcements) {
+    // Stop if prediction has already closed
+    if (now >= announcement.predictionCloseTime) {
+      await announcement.deleteOne();
+      continue;
+    }
+
+    try {
+      const channel = await client.channels.fetch(
+        announcement.channelId
+      );
+
+      if (!channel) continue;
+
+      const command =
+        announcement.type === 'race'
+          ? '/predict'
+          : '/predictqualifying';
+
+      const title =
+        announcement.type === 'race'
+          ? '🏎️ Race Predictions are OPEN!'
+          : '🏁 Qualifying Predictions are OPEN!';
+
+      await channel.send({
+        content:
+          `@everyone\n\n` +
+          `${title}\n\n` +
+          `Predictions are now open for **${announcement.name}**.\n\n` +
+          `Use \`${command}\` to submit your prediction.\n\n` +
+          `⏰ Predictions close:\n` +
+          `• <t:${Math.floor(
+            announcement.predictionCloseTime.getTime() / 1000
+          )}:R>\n` +
+          `• <t:${Math.floor(
+            announcement.predictionCloseTime.getTime() / 1000
+          )}:F>`
+      });
+
+      // Schedule next reminder
+      if (announcement.sendIndex === 0) {
+        announcement.nextAnnouncementAt =
+          new Date(now.getTime() + 3 * 60 * 60 * 1000);
+      } else {
+        announcement.nextAnnouncementAt =
+          new Date(now.getTime() + 6 * 60 * 60 * 1000);
+      }
+
+      announcement.sendIndex += 1;
+
+      // Finished all 5 announcements
+      if (announcement.sendIndex >= 5) {
+        await announcement.deleteOne();
+      } else {
+        await announcement.save();
+      }
+
+    } catch (error) {
+      console.error(
+        'Failed to send announcement:',
         error
       );
     }

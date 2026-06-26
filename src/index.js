@@ -19,6 +19,7 @@ import qualifyingresultCommand from './commands/qualifyingresult.js';
 import deletequalifyingCommand from './commands/deletequalifying.js';
 import predictionstatsCommand from './commands/predictionstats.js';
 import remindCommand from './commands/remind.js';
+import announcementCommand from './commands/announcement.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -52,6 +53,7 @@ qualifyingresultCommand,
 deletequalifyingCommand,
 predictionstatsCommand,
 remindCommand,
+announcementCommand,
 ];
 
 for (const command of commands) {
