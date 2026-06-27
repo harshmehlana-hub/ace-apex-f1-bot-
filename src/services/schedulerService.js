@@ -279,8 +279,7 @@ async function processAnnouncements(client) {
 
       await channel.send({
         content:
-          `@everyone\n\n` +
-          `${title}\n\n` +
+          `@everyone ${title}\n\n` +
           `Predictions are now open for **${announcement.name}**.\n\n` +
           `Use \`${command}\` to submit your prediction.\n\n` +
           `⏰ Predictions close:\n` +
