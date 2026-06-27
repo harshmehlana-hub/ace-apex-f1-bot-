@@ -150,6 +150,8 @@ export default {
 
       const p3Driver = p3Interaction.values[0];
 
+      await p3Interaction.deferUpdate();
+
       const result = await Result.create({
         raceId,
         p1Driver,
@@ -187,6 +189,7 @@ export default {
           );
 
           await resultsChannel.send({
+            content: '@everyone 🏎️ Race Results are OUT!',
             embeds: [embed],
           });
         }
@@ -194,7 +197,7 @@ export default {
         console.error(err);
       }
 
-      await p3Interaction.update({
+      await interaction.editReply({
         content:
           `✅ Results processed successfully!\n\n` +
           `🏁 ${race.name}\n` +

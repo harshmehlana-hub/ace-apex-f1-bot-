@@ -108,8 +108,9 @@ export default {
           time: 60000,
         });
 
-      const poleDriver =
-        driverInteraction.values[0];
+      const poleDriver = driverInteraction.values[0];
+
+await driverInteraction.deferUpdate();
 
       const result =
         new QualifyingResult({
@@ -190,6 +191,7 @@ await standing.save();
             );
 
           await resultsChannel.send({
+          content: '@everyone 🏁 Qualifying Results are OUT!',
             embeds: [embed],
           });
         }
@@ -200,7 +202,7 @@ await standing.save();
         );
       }
 
-      await driverInteraction.update({
+      await interaction.editReply({
         content:
           `✅ Results processed successfully!\n\n` +
           `🏁 ${qualifying.name}\n` +
