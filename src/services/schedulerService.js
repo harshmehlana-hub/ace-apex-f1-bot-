@@ -255,10 +255,41 @@ async function processAnnouncements(client) {
 
   for (const announcement of announcements) {
     // Stop if prediction has already closed
-    if (now >= announcement.predictionCloseTime) {
-      await announcement.deleteOne();
-      continue;
+   if (now >= announcement.predictionCloseTime) {
+  try {
+    const channel = await client.channels.fetch(
+      announcement.channelId
+    );
+
+    if (channel) {
+      const eventType =
+        announcement.type === 'race'
+          ? 'Race'
+          : 'Qualifying';
+
+      const closingMessage =
+        announcement.type === 'race'
+          ? 'Best of luck to everyone on the grid! 🏎️'
+          : 'Best of luck to everyone on the grid! 🏁';
+
+      await channel.send({
+        content:
+          `@everyone 🔒 **${eventType} Predictions are now CLOSED!**\n\n` +
+          `Predictions for **${announcement.name}** are now closed.\n\n` +
+          `${closingMessage}\n\n` +
+          `Results will be published after the ${announcement.type}.`,
+      });
     }
+  } catch (error) {
+    console.error(
+      'Failed to send closing announcement:',
+      error
+    );
+  }
+
+  await announcement.deleteOne();
+  continue;
+}
 
     try {
       const channel = await client.channels.fetch(
