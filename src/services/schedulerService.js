@@ -10,6 +10,7 @@ import {
   createPredictionStatisticsEmbed,
 } from '../utils/embeds.js';
 import { Prediction } from '../database/models/Prediction.js';
+import { Membership } from '../database/models/Membership.js';
 
 export function setupScheduler(client) {
   // Run every minute
@@ -18,6 +19,7 @@ export function setupScheduler(client) {
     await updateQualifyingStatuses(client);
     await processReminders(client);
     await processAnnouncements(client);
+    await processMemberships(client);
   });
 
   console.log('Scheduler initialized');
@@ -343,6 +345,38 @@ async function processAnnouncements(client) {
     } catch (error) {
       console.error(
         'Failed to send announcement:',
+        error
+      );
+    }
+  }
+}
+async function processMemberships(client) {
+  const now = new Date();
+
+  const memberships = await Membership.find({
+    expiresAt: { $lte: now },
+  });
+
+  for (const membership of memberships) {
+    try {
+      const guild = await client.guilds.fetch(membership.guildId);
+
+      const member = await guild.members
+        .fetch(membership.userId)
+        .catch(() => null);
+
+      if (member) {
+        await member.roles.remove(membership.roleId);
+      }
+
+      await membership.deleteOne();
+
+      console.log(
+        `Membership expired for ${membership.userId}`
+      );
+    } catch (error) {
+      console.error(
+        'Failed to process membership:',
         error
       );
     }

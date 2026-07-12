@@ -19,6 +19,8 @@ import deletequalifyingCommand from './commands/deletequalifying.js';
 import predictionstatsCommand from './commands/predictionstats.js';
 import remindCommand from './commands/remind.js';
 import announcementCommand from './commands/announcement.js';
+import grantmembershipCommand from './commands/grantmembership.js';
+import membershipinfoCommand from './commands/membershipinfo.js';
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -38,6 +40,8 @@ deletequalifyingCommand.data.toJSON(),
 predictionstatsCommand.data.toJSON(),
 remindCommand.data.toJSON(),
 announcementCommand.data.toJSON(),
+grantmembershipCommand.data.toJSON(),
+membershipinfoCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);

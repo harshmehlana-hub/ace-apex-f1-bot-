@@ -14,9 +14,11 @@ export const config = {
 },
 season: process.env.CURRENT_SEASON,
   roles: {
-    predictor: process.env.PREDICTOR_ROLE_ID,
-    admin: process.env.ADMIN_ROLE_ID,
-  },
+  predictor: process.env.PREDICTOR_ROLE_ID,
+  admin: process.env.ADMIN_ROLE_ID,
+  supporter: process.env.SUPPORTER_ROLE_ID,
+  racePass: process.env.RACEPASS_ROLE_ID,
+},
   // Prediction window timing (in milliseconds)
   timing: {
     openBefore: 24 * 60 * 60 * 1000,  // 24 hours before race

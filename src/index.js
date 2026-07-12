@@ -20,6 +20,8 @@ import deletequalifyingCommand from './commands/deletequalifying.js';
 import predictionstatsCommand from './commands/predictionstats.js';
 import remindCommand from './commands/remind.js';
 import announcementCommand from './commands/announcement.js';
+import grantmembershipCommand from './commands/grantmembership.js';
+import membershipinfoCommand from './commands/membershipinfo.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -54,6 +56,8 @@ deletequalifyingCommand,
 predictionstatsCommand,
 remindCommand,
 announcementCommand,
+grantmembershipCommand,
+membershipinfoCommand,
 ];
 
 for (const command of commands) {
