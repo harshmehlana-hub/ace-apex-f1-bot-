@@ -76,7 +76,11 @@ async function main() {
     console.log("MONGODB_URI:", process.env.MONGODB_URI ? "FOUND" : "NOT FOUND");
 
     await connectDatabase();
-    console.log('Connected to MongoDB');    
+    console.log('Connected to MongoDB');
+
+console.log("DISCORD_TOKEN:", process.env.DISCORD_TOKEN ? "FOUND" : "NOT FOUND");
+console.log("config.token exists:", !!config.token);
+console.log("Attempting Discord login..."); 
     await client.login(config.token);
    
     process.on('exit', (code) => {
