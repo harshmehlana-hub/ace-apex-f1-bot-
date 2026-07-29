@@ -354,26 +354,134 @@ async function processMemberships(client) {
   const now = new Date();
 
   const memberships = await Membership.find({
-    expiresAt: { $lte: now },
+    type: { $in: ['monthly', 'yearly'] },
   });
 
   for (const membership of memberships) {
     try {
-      const guild = await client.guilds.fetch(membership.guildId);
+      const expiresIn =
+        membership.expiresAt.getTime() - now.getTime();
 
-      const member = await guild.members
-        .fetch(membership.userId)
-        .catch(() => null);
+      const fiveDays = 5 * 24 * 60 * 60 * 1000;
+      const oneDay = 24 * 60 * 60 * 1000;
 
-      if (member) {
-        await member.roles.remove(membership.roleId);
+      // -----------------------------
+      // 5 DAY REMINDER
+      // -----------------------------
+      if (
+        expiresIn > oneDay &&
+        expiresIn <= fiveDays &&
+        !membership.fiveDayReminderSent
+      ) {
+        const user = await client.users
+          .fetch(membership.userId)
+          .catch(() => null);
+
+        if (user) {
+          await user.send(
+            `**Hey ${user.username}! 👋**
+
+Your **${membership.type === 'monthly'
+              ? 'Monthly Membership'
+              : 'Yearly Membership'}** will expire in **5 days**.
+
+**Expires:** <t:${Math.floor(
+              membership.expiresAt.getTime() / 1000
+            )}:F>
+
+If you'd like to renew your membership, please **DM Ace** before it expires to avoid losing your membership benefits.
+
+Thank you for supporting **Ace's Apex**! ❤️`
+          );
+
+          membership.fiveDayReminderSent = true;
+          await membership.save();
+        }
       }
 
-      await membership.deleteOne();
+      // -----------------------------
+      // 1 DAY REMINDER
+      // -----------------------------
+      if (
+        expiresIn > 0 &&
+        expiresIn <= oneDay &&
+        !membership.oneDayReminderSent
+      ) {
+        const user = await client.users
+          .fetch(membership.userId)
+          .catch(() => null);
 
-      console.log(
-        `Membership expired for ${membership.userId}`
-      );
+        if (user) {
+          await user.send(
+            `**Hey ${user.username}! 👋**
+
+Your **${membership.type === 'monthly'
+              ? 'Monthly Membership'
+              : 'Yearly Membership'}** will expire **tomorrow**.
+
+**Expires:** <t:${Math.floor(
+              membership.expiresAt.getTime() / 1000
+            )}:F>
+
+To keep your membership active without interruption, please **DM Ace** today to renew it.
+
+Thank you for supporting **Ace's Apex**! ❤️`
+          );
+
+          membership.oneDayReminderSent = true;
+          await membership.save();
+        }
+      }
+
+      // -----------------------------
+      // EXPIRED
+      // -----------------------------
+      if (
+        expiresIn <= 0 &&
+        !membership.expiryReminderSent
+      ) {
+        const guild = await client.guilds
+          .fetch(membership.guildId)
+          .catch(() => null);
+
+        if (guild && membership.roleId) {
+          const member = await guild.members
+            .fetch(membership.userId)
+            .catch(() => null);
+
+          if (member) {
+            await member.roles.remove(membership.roleId);
+          }
+        }
+
+        const user = await client.users
+          .fetch(membership.userId)
+          .catch(() => null);
+
+        if (user) {
+          await user.send(
+            `**Hey ${user.username}! 👋**
+
+Your **${membership.type === 'monthly'
+              ? 'Monthly Membership'
+              : 'Yearly Membership'}** has now expired.
+
+Your membership benefits have been removed.
+
+If you'd like to become a member again, please **DM Ace** to renew your membership.
+
+Thank you for supporting **Ace's Apex**! ❤️`
+          );
+        }
+
+        membership.expiryReminderSent = true;
+        membership.roleId = null;
+        await membership.save();
+
+        console.log(
+          `Membership expired for ${membership.userId}`
+        );
+      }
     } catch (error) {
       console.error(
         'Failed to process membership:',

@@ -22,6 +22,7 @@ import remindCommand from './commands/remind.js';
 import announcementCommand from './commands/announcement.js';
 import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
+import deletemembershipCommand from './commands/deletemembership.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -58,6 +59,7 @@ remindCommand,
 announcementCommand,
 grantmembershipCommand,
 membershipinfoCommand,
+deletemembershipCommand,
 ];
 
 for (const command of commands) {
@@ -76,6 +78,10 @@ async function main() {
     await connectDatabase();
     console.log('Connected to MongoDB');    
     await client.login(config.token);
+   
+    process.on('exit', (code) => {
+  console.log('PROCESS EXITED WITH CODE:', code);
+});
     
     
   } catch (error) {

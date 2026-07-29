@@ -13,9 +13,9 @@ const membershipSchema = new mongoose.Schema({
   },
 
   roleId: {
-    type: String,
-    required: true,
-  },
+  type: String,
+  default: null,
+},
 
   type: {
     type: String,
@@ -23,9 +23,24 @@ const membershipSchema = new mongoose.Schema({
     required: true,
   },
 
-  expiresAt: {
+    expiresAt: {
     type: Date,
     required: true,
+  },
+
+  fiveDayReminderSent: {
+    type: Boolean,
+    default: false,
+  },
+
+  oneDayReminderSent: {
+    type: Boolean,
+    default: false,
+  },
+
+  expiryReminderSent: {
+    type: Boolean,
+    default: false,
   },
 });
 

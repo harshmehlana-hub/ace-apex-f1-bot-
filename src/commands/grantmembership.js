@@ -35,7 +35,9 @@ export default {
       PermissionFlagsBits.Administrator
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client) {
+console.log("Instance:", process.pid);
+console.log("Command received at:", new Date().toISOString());
     if (!isAdmin(interaction.member, config.roles.admin)) {
       return interaction.reply({
         content: '❌ You do not have permission to use this command.',
@@ -102,6 +104,9 @@ export default {
       membership.type = type;
       membership.guildId = interaction.guild.id;
       membership.expiresAt = expiry;
+membership.fiveDayReminderSent = false;
+membership.oneDayReminderSent = false;
+membership.expiryReminderSent = false;
 
       await membership.save();
     } else {
@@ -114,7 +119,46 @@ export default {
       });
     }
 
-    await interaction.reply({
+try {
+  console.log("=== DM START ===");
+  console.log("Target:", member.user.tag, member.id);
+
+  const user = await client.users.fetch(member.id);
+  console.log("Fetched user");
+
+  const membershipName =
+    type === "race"
+      ? "Race Pass"
+      : type === "monthly"
+      ? "Monthly Membership"
+      : "Yearly Membership";
+
+  console.log("Sending...");
+
+  await user.send(
+  `**Hey @${member.user.username}! 👋**
+
+Your membership is now active on the server.
+
+**Type:** ${membershipName}
+**Valid till:** <t:${Math.floor(expiry.getTime() / 1000)}:F>
+
+Thank you for supporting **Ace's Apex**! We truly appreciate your support. 🥳❤️`
+);
+
+console.log("DM timestamp:", Date.now());
+  console.log("✅ DM SENT");
+} catch (error) {
+  console.error("❌ DM FAILED");
+  console.error(error);
+}
+console.log("Guild ID:", interaction.guild.id);
+console.log("Member ID:", member.id);
+console.log("In cache:", interaction.guild.members.cache.has(member.id));
+console.log("Before reply:");
+console.log("interaction.replied =", interaction.replied);
+console.log("interaction.deferred =", interaction.deferred);    
+await interaction.reply({
       content:
         `✅ Membership granted successfully!\n\n` +
         `👤 Member: ${member}\n` +
