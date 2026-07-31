@@ -22,6 +22,7 @@ import announcementCommand from './commands/announcement.js';
 import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
 import deletemembershipCommand from './commands/deletemembership.js';
+import privacyCommand from './commands/privacy.js'
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -44,6 +45,7 @@ announcementCommand.data.toJSON(),
 grantmembershipCommand.data.toJSON(),
 membershipinfoCommand.data.toJSON(),
 deletemembershipCommand.data.toJSON(),
+privacyCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);

@@ -23,6 +23,7 @@ import announcementCommand from './commands/announcement.js';
 import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
 import deletemembershipCommand from './commands/deletemembership.js';
+import privacyCommand from './commands/privacy.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -60,6 +61,7 @@ announcementCommand,
 grantmembershipCommand,
 membershipinfoCommand,
 deletemembershipCommand,
+privacyCommand
 ];
 
 for (const command of commands) {
