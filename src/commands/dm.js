@@ -32,12 +32,16 @@ export default {
 
   async execute(interaction, client) {
 
-    if (!isAdmin(interaction.member, config.roles.admin)) {
-      return interaction.reply({
-        content: '❌ You do not have permission to use this command.',
-        ephemeral: true,
-      });
-    }
+    const allowed =
+  interaction.member.roles.cache.has(config.roles.admin) ||
+  interaction.member.roles.cache.has('1533445133427806268');
+
+if (!allowed) {
+  return interaction.reply({
+    content: '❌ You do not have permission to use this command.',
+    ephemeral: true,
+  });
+}
 
     const target = interaction.options.getUser('user');
     const message = interaction.options.getString('message');
