@@ -6,6 +6,7 @@ import {
 import { Membership } from '../database/models/Membership.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { logDM } from '../utils/dmLogger.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -144,6 +145,13 @@ Your membership is now active on the server.
 **Valid till:** <t:${Math.floor(expiry.getTime() / 1000)}:F>
 
 Thank you for supporting **Ace's Apex**! We truly appreciate your support. 🥳❤️`
+);
+await logDM(
+  client,
+  'Membership Activated',
+  interaction.user,
+  user,
+  `Membership Type: ${membershipName}`
 );
 
 console.log("DM timestamp:", Date.now());

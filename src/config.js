@@ -11,6 +11,7 @@ export const config = {
   logs: process.env.LOGS_CHANNEL_ID,
   results: process.env.RESULTS_CHANNEL_ID,
   statistics: process.env.STATISTICS_CHANNEL_ID,
+  dmLogs: process.env.DM_LOGS_CHANNEL_ID,
 },
 season: process.env.CURRENT_SEASON,
   roles: {

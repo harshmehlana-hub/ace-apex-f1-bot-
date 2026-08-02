@@ -1,6 +1,12 @@
-import { Client, Collection, GatewayIntentBits } from 'discord.js';
+import {
+  Client,
+  Collection,
+  GatewayIntentBits,
+  Partials,
+} from 'discord.js';
 import { config } from './config.js';
 import { connectDatabase } from './database/connection.js';
+import { logDM } from './utils/dmLogger.js';
 
 // Import commands
 import predictCommand from './commands/predict.js';
@@ -24,6 +30,7 @@ import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
 import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js';
+import dmCommand from './commands/dm.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -33,6 +40,12 @@ const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+
+  partials: [
+    Partials.Channel,
   ],
 });
 
@@ -61,7 +74,8 @@ announcementCommand,
 grantmembershipCommand,
 membershipinfoCommand,
 deletemembershipCommand,
-privacyCommand
+privacyCommand,
+dmCommand,
 ];
 
 for (const command of commands) {
@@ -71,6 +85,36 @@ for (const command of commands) {
 // Register events
 client.once('ready', () => readyEvent.execute(client));
 client.on('interactionCreate', (interaction) => interactionCreateEvent.execute(interaction, client));
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  // Only log DMs
+  if (message.guild) return;
+
+let content = message.content;
+
+if (message.attachments.size > 0) {
+  const attachments = message.attachments
+    .map(a => a.url)
+    .join('\n');
+
+  content +=
+    (content ? '\n\n' : '') +
+    `📎 Attachments:\n${attachments}`;
+}
+
+if (!content) {
+  content = '*No text message*';
+}
+
+await logDM(
+  client,
+  'Incoming DM',
+  null,
+  message.author,
+  content
+);
+});
 
 // Start the bot
 async function main() {

@@ -394,6 +394,16 @@ If you'd like to renew your membership, please **DM Ace** before it expires to a
 Thank you for supporting **Ace's Apex**! ❤️`
           );
 
+await logDM(
+  client,
+  '5-Day Reminder',
+  null,
+  user,
+  `Membership expires on <t:${Math.floor(
+    membership.expiresAt.getTime() / 1000
+  )}:F>`
+);
+
           membership.fiveDayReminderSent = true;
           await membership.save();
         }
@@ -427,6 +437,16 @@ To keep your membership active without interruption, please **DM Ace** today to 
 
 Thank you for supporting **Ace's Apex**! ❤️`
           );
+
+await logDM(
+  client,
+  '1-Day Reminder',
+  null,
+  user,
+  `Membership expires on <t:${Math.floor(
+    membership.expiresAt.getTime() / 1000
+  )}:F>`
+);
 
           membership.oneDayReminderSent = true;
           await membership.save();
@@ -472,6 +492,16 @@ If you'd like to become a member again, please **DM Ace** to renew your membersh
 
 Thank you for supporting **Ace's Apex**! ❤️`
           );
+
+await logDM(
+    client,
+    'Membership Expired',
+    null,
+    user,
+    `Membership expired on <t:${Math.floor(
+      membership.expiresAt.getTime() / 1000
+    )}:F>`
+  );
         }
 
         membership.expiryReminderSent = true;
