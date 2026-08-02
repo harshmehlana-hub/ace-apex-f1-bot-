@@ -1,15 +1,11 @@
-import {
-  SlashCommandBuilder,
-  PermissionFlagsBits,
-} from 'discord.js';
+import { SlashCommandBuilder } from 'discord.js';
 
-import { config } from '../config.js';
 import { logDM } from '../utils/dmLogger.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('dm')
-    .setDescription('Send a DM to a user (Admin only)')
+    .setDescription('Send a DM to a user')
 
     .addUserOption(option =>
       option
@@ -23,22 +19,26 @@ export default {
         .setName('message')
         .setDescription('Message to send')
         .setRequired(true)
-    )
-
-    .setDefaultMemberPermissions(null),
+    ),
 
   async execute(interaction, client) {
 
-    const allowed =
-  interaction.member.roles.cache.has(config.roles.admin) ||
-  interaction.member.roles.cache.has('1533445133427806268');
+    const STAFF_ROLES = [
+      '1533445133427806268', //paul
+      '1476275477416247338', //admins
+      '1506635584322670702', //communitymanager
+    ];
 
-if (!allowed) {
-  return interaction.reply({
-    content: '❌ You do not have permission to use this command.',
-    ephemeral: true,
-  });
-}
+    const allowed = STAFF_ROLES.some(roleId =>
+      interaction.member.roles.cache.has(roleId)
+    );
+
+    if (!allowed) {
+      return interaction.reply({
+        content: '❌ You do not have permission to use this command.',
+        ephemeral: true,
+      });
+    }
 
     const target = interaction.options.getUser('user');
     const message = interaction.options.getString('message');
@@ -69,6 +69,5 @@ if (!allowed) {
       });
 
     }
-
   },
 };
