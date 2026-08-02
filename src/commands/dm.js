@@ -4,7 +4,6 @@ import {
 } from 'discord.js';
 
 import { config } from '../config.js';
-import { isAdmin } from '../utils/validators.js';
 import { logDM } from '../utils/dmLogger.js';
 
 export default {
@@ -26,9 +25,7 @@ export default {
         .setRequired(true)
     )
 
-    .setDefaultMemberPermissions(
-      PermissionFlagsBits.Administrator
-    ),
+    .setDefaultMemberPermissions(null),
 
   async execute(interaction, client) {
 
