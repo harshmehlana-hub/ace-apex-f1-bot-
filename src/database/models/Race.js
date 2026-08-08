@@ -27,6 +27,10 @@ season: {
     default: 'upcoming',
     index: true,
   },
+  predictorOfTheWeekIds: {
+  type: [String],
+  default: [],
+  },
   announcementSent: {
     type: Boolean,
     default: false,

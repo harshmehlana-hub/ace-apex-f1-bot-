@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
+  Routes,
 } from 'discord.js';
 
 import { Membership } from '../database/models/Membership.js';
@@ -37,8 +38,15 @@ export default {
     ),
 
   async execute(interaction, client) {
-console.log("Instance:", process.pid);
-console.log("Command received at:", new Date().toISOString());
+    console.log('Instance:', process.pid);
+    console.log(
+      'Command received at:',
+      new Date().toISOString()
+    );
+
+    // ----------------------------------------
+    // ADMIN CHECK
+    // ----------------------------------------
     if (!isAdmin(interaction.member, config.roles.admin)) {
       return interaction.reply({
         content: '❌ You do not have permission to use this command.',
@@ -46,16 +54,22 @@ console.log("Command received at:", new Date().toISOString());
       });
     }
 
-    const member = interaction.options.getMember('user');
+    // ----------------------------------------
+    // GET USER
+    // ----------------------------------------
+    const user = interaction.options.getUser('user');
     const type = interaction.options.getString('type');
 
-    if (!member) {
+    if (!user) {
       return interaction.reply({
-        content: '❌ Member not found.',
+        content: '❌ User not found.',
         ephemeral: true,
       });
     }
 
+    // ----------------------------------------
+    // MEMBERSHIP TYPE
+    // ----------------------------------------
     let roleId;
     let durationDays;
 
@@ -74,9 +88,20 @@ console.log("Command received at:", new Date().toISOString());
         roleId = config.roles.supporter;
         durationDays = 365;
         break;
+
+      default:
+        return interaction.reply({
+          content: '❌ Invalid membership type.',
+          ephemeral: true,
+        });
     }
 
-    const role = interaction.guild.roles.cache.get(roleId);
+    // ----------------------------------------
+    // CHECK MEMBERSHIP ROLE EXISTS
+    // ----------------------------------------
+    const role = await interaction.guild.roles
+      .fetch(roleId)
+      .catch(() => null);
 
     if (!role) {
       return interaction.reply({
@@ -85,10 +110,41 @@ console.log("Command received at:", new Date().toISOString());
       });
     }
 
-    await member.roles.add(role);
+    // ----------------------------------------
+    // ADD ROLE USING REST API
+    // Does NOT require GuildMembers intent
+    // ----------------------------------------
+    try {
+      await client.rest.put(
+        Routes.guildMemberRole(
+          interaction.guild.id,
+          user.id,
+          roleId
+        )
+      );
 
+      console.log(
+        `✅ Role ${roleId} added to ${user.id}`
+      );
+    } catch (error) {
+      console.error(
+        '❌ Failed to add membership role:',
+        error
+      );
+
+      return interaction.reply({
+        content:
+          '❌ Failed to add the membership role. ' +
+          'Make sure the user is still a member of this server and the bot can manage the role.',
+        ephemeral: true,
+      });
+    }
+
+    // ----------------------------------------
+    // FIND EXISTING MEMBERSHIP
+    // ----------------------------------------
     let membership = await Membership.findOne({
-      userId: member.id,
+      userId: user.id,
     });
 
     const now = new Date();
@@ -100,19 +156,23 @@ console.log("Command received at:", new Date().toISOString());
 
     expiry.setDate(expiry.getDate() + durationDays);
 
+    // ----------------------------------------
+    // UPDATE / CREATE MEMBERSHIP
+    // ----------------------------------------
     if (membership) {
       membership.roleId = roleId;
       membership.type = type;
       membership.guildId = interaction.guild.id;
       membership.expiresAt = expiry;
-membership.fiveDayReminderSent = false;
-membership.oneDayReminderSent = false;
-membership.expiryReminderSent = false;
+
+      membership.fiveDayReminderSent = false;
+      membership.oneDayReminderSent = false;
+      membership.expiryReminderSent = false;
 
       await membership.save();
     } else {
       await Membership.create({
-        userId: member.id,
+        userId: user.id,
         guildId: interaction.guild.id,
         roleId,
         type,
@@ -120,57 +180,57 @@ membership.expiryReminderSent = false;
       });
     }
 
-try {
-  console.log("=== DM START ===");
-  console.log("Target:", member.user.tag, member.id);
+    // ----------------------------------------
+    // SEND ACTIVATION DM
+    // ----------------------------------------
+    try {
+      console.log('=== DM START ===');
+      console.log('Target:', user.tag, user.id);
 
-  const user = await client.users.fetch(member.id);
-  console.log("Fetched user");
+      const membershipName =
+        type === 'race'
+          ? 'Race Pass'
+          : type === 'monthly'
+            ? 'Monthly Membership'
+            : 'Yearly Membership';
 
-  const membershipName =
-    type === "race"
-      ? "Race Pass"
-      : type === "monthly"
-      ? "Monthly Membership"
-      : "Yearly Membership";
+      console.log('Sending...');
 
-  console.log("Sending...");
+      await user.send(
+        `**Hey ${user.username}! 👋**\n\n` +
+        `Your membership is now active on the server.\n\n` +
+        `**Type:** ${membershipName}\n` +
+        `**Valid till:** <t:${Math.floor(
+          expiry.getTime() / 1000
+        )}:F>\n\n` +
+        `Thank you for supporting **Ace's Apex**! We truly appreciate your support. 🥳❤️`
+      );
 
-  await user.send(
-  `**Hey @${member.user.username}! 👋**
+      await logDM(
+        client,
+        'Membership Activated',
+        interaction.user,
+        user,
+        `Membership Type: ${membershipName}`
+      );
 
-Your membership is now active on the server.
+      console.log('DM timestamp:', Date.now());
+      console.log('✅ DM SENT');
+    } catch (error) {
+      console.error('❌ DM FAILED');
+      console.error(error);
+    }
 
-**Type:** ${membershipName}
-**Valid till:** <t:${Math.floor(expiry.getTime() / 1000)}:F>
-
-Thank you for supporting **Ace's Apex**! We truly appreciate your support. 🥳❤️`
-);
-await logDM(
-  client,
-  'Membership Activated',
-  interaction.user,
-  user,
-  `Membership Type: ${membershipName}`
-);
-
-console.log("DM timestamp:", Date.now());
-  console.log("✅ DM SENT");
-} catch (error) {
-  console.error("❌ DM FAILED");
-  console.error(error);
-}
-console.log("Guild ID:", interaction.guild.id);
-console.log("Member ID:", member.id);
-console.log("In cache:", interaction.guild.members.cache.has(member.id));
-console.log("Before reply:");
-console.log("interaction.replied =", interaction.replied);
-console.log("interaction.deferred =", interaction.deferred);    
-await interaction.reply({
+    // ----------------------------------------
+    // FINAL REPLY
+    // ----------------------------------------
+    await interaction.reply({
       content:
         `✅ Membership granted successfully!\n\n` +
-        `👤 Member: ${member}\n` +
-        `🎟️ Type: ${type.charAt(0).toUpperCase() + type.slice(1)}\n` +
+        `👤 Member: ${user}\n` +
+        `🎟️ Type: ${
+          type.charAt(0).toUpperCase() + type.slice(1)
+        }\n` +
         `⏰ Expires:\n` +
         `<t:${Math.floor(expiry.getTime() / 1000)}:F>\n` +
         `<t:${Math.floor(expiry.getTime() / 1000)}:R>`,

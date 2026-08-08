@@ -10,7 +10,7 @@ import { isAdmin } from '../utils/validators.js';
 export default {
   data: new SlashCommandBuilder()
     .setName('membershipinfo')
-    .setDescription('View a member\'s membership information')
+    .setDescription("View a member's membership information")
 
     .addUserOption(option =>
       option
@@ -24,43 +24,60 @@ export default {
     ),
 
   async execute(interaction) {
+    // ----------------------------------------
+    // ADMIN CHECK
+    // ----------------------------------------
     if (!isAdmin(interaction.member, config.roles.admin)) {
       return interaction.reply({
-        content: '❌ You do not have permission to use this command.',
+        content:
+          '❌ You do not have permission to use this command.',
         ephemeral: true,
       });
     }
 
-    const member = interaction.options.getMember('user');
+    // ----------------------------------------
+    // GET USER
+    // ----------------------------------------
+    const user = interaction.options.getUser('user');
 
-    if (!member) {
+    if (!user) {
       return interaction.reply({
-        content: '❌ Member not found.',
+        content: '❌ User not found.',
         ephemeral: true,
       });
     }
 
+    // ----------------------------------------
+    // FIND MEMBERSHIP
+    // ----------------------------------------
     const membership = await Membership.findOne({
-      userId: member.id,
+      userId: user.id,
     });
 
     if (!membership) {
       return interaction.reply({
-        content: `${member} does not have an active membership.`,
+        content:
+          `${user} does not have an active membership.`,
         ephemeral: true,
       });
     }
 
+    // ----------------------------------------
+    // MEMBERSHIP TYPE
+    // ----------------------------------------
     const type =
       membership.type === 'race'
         ? 'Race Pass'
         : membership.type === 'monthly'
-        ? 'Monthly'
-        : 'Yearly';
+          ? 'Monthly'
+          : 'Yearly';
 
+    // ----------------------------------------
+    // RESPONSE
+    // ----------------------------------------
     await interaction.reply({
       content:
-        `👤 **Member:** ${member}\n\n` +
+        `👤 **Member:** ${user}\n\n` +
         `🎟️ **Membership:** ${type}\n` +
         `🎭 **Role:** <@&${membership.roleId}>\n\n` +
         `⏰ **Expires:**\n` +

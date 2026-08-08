@@ -39,9 +39,7 @@ import interactionCreateEvent from './events/interactionCreate.js';
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.MessageContent,
   ],
 
   partials: [

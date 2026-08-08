@@ -1,16 +1,22 @@
 import cron from 'node-cron';
+import { Routes } from 'discord.js';
+
 import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { Announcement } from '../database/models/Announcement.js';
+import { Prediction } from '../database/models/Prediction.js';
+import { Membership } from '../database/models/Membership.js';
+
 import { config } from '../config.js';
+
 import {
   createRaceAnnouncementEmbed,
   createQualifyingAnnouncementEmbed,
   createPredictionStatisticsEmbed,
 } from '../utils/embeds.js';
-import { Prediction } from '../database/models/Prediction.js';
-import { Membership } from '../database/models/Membership.js';
+
+import { logDM } from '../utils/dmLogger.js';
 
 export function setupScheduler(client) {
   // Run every minute
@@ -28,7 +34,9 @@ export function setupScheduler(client) {
 async function updateRaceStatuses(client) {
   const now = new Date();
 
-  // Open races
+  // -----------------------------
+  // OPEN RACES
+  // -----------------------------
   const racesToOpen = await Race.find({
     status: 'upcoming',
     predictionOpenTime: { $lte: now },
@@ -46,14 +54,17 @@ async function updateRaceStatuses(client) {
     }
   }
 
-  // Close races
+  // -----------------------------
+  // CLOSE RACES
+  // -----------------------------
   const racesToClose = await Race.find({
     status: 'open',
     predictionCloseTime: { $lte: now },
   });
 
   for (const race of racesToClose) {
-await sendPredictionStatistics(client, race);
+    await sendPredictionStatistics(client, race);
+
     race.status = 'closed';
     await race.save();
   }
@@ -62,7 +73,9 @@ await sendPredictionStatistics(client, race);
 async function updateQualifyingStatuses(client) {
   const now = new Date();
 
-  // Open qualifying sessions
+  // -----------------------------
+  // OPEN QUALIFYING
+  // -----------------------------
   const sessionsToOpen = await Qualifying.find({
     status: 'upcoming',
     predictionOpenTime: { $lte: now },
@@ -83,7 +96,9 @@ async function updateQualifyingStatuses(client) {
     }
   }
 
-  // Close qualifying sessions
+  // -----------------------------
+  // CLOSE QUALIFYING
+  // -----------------------------
   const sessionsToClose = await Qualifying.find({
     status: 'open',
     predictionCloseTime: { $lte: now },
@@ -137,7 +152,8 @@ async function sendQualifyingOpenAnnouncement(
       );
 
     await channel.send({
-      content: '@everyone 🏁 Qualifying Predictions are now LIVE!',
+      content:
+        '@everyone 🏁 Qualifying Predictions are now LIVE!',
       embeds: [embed],
     });
   } catch (error) {
@@ -148,7 +164,10 @@ async function sendQualifyingOpenAnnouncement(
   }
 }
 
-async function sendPredictionStatistics(client, race) {
+async function sendPredictionStatistics(
+  client,
+  race
+) {
   try {
     const predictions = await Prediction.find({
       raceId: race._id,
@@ -188,22 +207,23 @@ async function sendPredictionStatistics(client, race) {
 
     if (!channel) return;
 
-    const embed = createPredictionStatisticsEmbed(
-      race,
-      totalPredictions,
+    const embed =
+      createPredictionStatisticsEmbed(
+        race,
+        totalPredictions,
 
-      topP1[0],
-      topP1[1],
-      ((topP1[1] / totalPredictions) * 100).toFixed(1),
+        topP1[0],
+        topP1[1],
+        ((topP1[1] / totalPredictions) * 100).toFixed(1),
 
-      topP2[0],
-      topP2[1],
-      ((topP2[1] / totalPredictions) * 100).toFixed(1),
+        topP2[0],
+        topP2[1],
+        ((topP2[1] / totalPredictions) * 100).toFixed(1),
 
-      topP3[0],
-      topP3[1],
-      ((topP3[1] / totalPredictions) * 100).toFixed(1)
-    );
+        topP3[0],
+        topP3[1],
+        ((topP3[1] / totalPredictions) * 100).toFixed(1)
+      );
 
     await channel.send({
       embeds: [embed],
@@ -215,6 +235,7 @@ async function sendPredictionStatistics(client, race) {
     );
   }
 }
+
 async function processReminders(client) {
   const now = new Date();
 
@@ -248,6 +269,7 @@ async function processReminders(client) {
     }
   }
 }
+
 async function processAnnouncements(client) {
   const now = new Date();
 
@@ -256,43 +278,48 @@ async function processAnnouncements(client) {
   });
 
   for (const announcement of announcements) {
-    // Stop if prediction has already closed
-   if (now >= announcement.predictionCloseTime) {
-  try {
-    const channel = await client.channels.fetch(
-      announcement.channelId
-    );
+    // -----------------------------
+    // PREDICTIONS CLOSED
+    // -----------------------------
+    if (now >= announcement.predictionCloseTime) {
+      try {
+        const channel = await client.channels.fetch(
+          announcement.channelId
+        );
 
-    if (channel) {
-      const eventType =
-        announcement.type === 'race'
-          ? 'Race'
-          : 'Qualifying';
+        if (channel) {
+          const eventType =
+            announcement.type === 'race'
+              ? 'Race'
+              : 'Qualifying';
 
-      const closingMessage =
-        announcement.type === 'race'
-          ? 'Best of luck to everyone on the grid! 🏎️'
-          : 'Best of luck to everyone on the grid! 🏁';
+          const closingMessage =
+            announcement.type === 'race'
+              ? 'Best of luck to everyone on the grid! 🏎️'
+              : 'Best of luck to everyone on the grid! 🏁';
 
-      await channel.send({
-        content:
-          `@everyone 🔒 **${eventType} Predictions are now CLOSED!**\n\n` +
-          `Predictions for **${announcement.name}** are now closed.\n\n` +
-          `${closingMessage}\n\n` +
-          `Results will be published after the ${announcement.type}.`,
-      });
+          await channel.send({
+            content:
+              `@everyone 🔒 **${eventType} Predictions are now CLOSED!**\n\n` +
+              `Predictions for **${announcement.name}** are now closed.\n\n` +
+              `${closingMessage}\n\n` +
+              `Results will be published after the ${announcement.type}.`,
+          });
+        }
+      } catch (error) {
+        console.error(
+          'Failed to send closing announcement:',
+          error
+        );
+      }
+
+      await announcement.deleteOne();
+      continue;
     }
-  } catch (error) {
-    console.error(
-      'Failed to send closing announcement:',
-      error
-    );
-  }
 
-  await announcement.deleteOne();
-  continue;
-}
-
+    // -----------------------------
+    // SEND ANNOUNCEMENT
+    // -----------------------------
     try {
       const channel = await client.channels.fetch(
         announcement.channelId
@@ -321,16 +348,20 @@ async function processAnnouncements(client) {
           )}:R>\n` +
           `• <t:${Math.floor(
             announcement.predictionCloseTime.getTime() / 1000
-          )}:F>`
+          )}:F>`,
       });
 
       // Schedule next reminder
       if (announcement.sendIndex === 0) {
         announcement.nextAnnouncementAt =
-          new Date(now.getTime() + 3 * 60 * 60 * 1000);
+          new Date(
+            now.getTime() + 3 * 60 * 60 * 1000
+          );
       } else {
         announcement.nextAnnouncementAt =
-          new Date(now.getTime() + 6 * 60 * 60 * 1000);
+          new Date(
+            now.getTime() + 6 * 60 * 60 * 1000
+          );
       }
 
       announcement.sendIndex += 1;
@@ -341,7 +372,6 @@ async function processAnnouncements(client) {
       } else {
         await announcement.save();
       }
-
     } catch (error) {
       console.error(
         'Failed to send announcement:',
@@ -350,6 +380,7 @@ async function processAnnouncements(client) {
     }
   }
 }
+
 async function processMemberships(client) {
   const now = new Date();
 
@@ -360,10 +391,14 @@ async function processMemberships(client) {
   for (const membership of memberships) {
     try {
       const expiresIn =
-        membership.expiresAt.getTime() - now.getTime();
+        membership.expiresAt.getTime() -
+        now.getTime();
 
-      const fiveDays = 5 * 24 * 60 * 60 * 1000;
-      const oneDay = 24 * 60 * 60 * 1000;
+      const fiveDays =
+        5 * 24 * 60 * 60 * 1000;
+
+      const oneDay =
+        24 * 60 * 60 * 1000;
 
       // -----------------------------
       // 5 DAY REMINDER
@@ -379,30 +414,28 @@ async function processMemberships(client) {
 
         if (user) {
           await user.send(
-            `**Hey ${user.username}! 👋**
-
-Your **${membership.type === 'monthly'
-              ? 'Monthly Membership'
-              : 'Yearly Membership'}** will expire in **5 days**.
-
-**Expires:** <t:${Math.floor(
+            `**Hey ${user.username}! 👋**\n\n` +
+            `Your **${
+              membership.type === 'monthly'
+                ? 'Monthly Membership'
+                : 'Yearly Membership'
+            }** will expire in **5 days**.\n\n` +
+            `**Expires:** <t:${Math.floor(
               membership.expiresAt.getTime() / 1000
-            )}:F>
-
-If you'd like to renew your membership, please **DM Ace** before it expires to avoid losing your membership benefits.
-
-Thank you for supporting **Ace's Apex**! ❤️`
+            )}:F>\n\n` +
+            `If you'd like to renew your membership, please **DM Ace** before it expires to avoid losing your membership benefits.\n\n` +
+            `Thank you for supporting **Ace's Apex**! ❤️`
           );
 
-await logDM(
-  client,
-  '5-Day Reminder',
-  null,
-  user,
-  `Membership expires on <t:${Math.floor(
-    membership.expiresAt.getTime() / 1000
-  )}:F>`
-);
+          await logDM(
+            client,
+            '5-Day Reminder',
+            null,
+            user,
+            `Membership expires on <t:${Math.floor(
+              membership.expiresAt.getTime() / 1000
+            )}:F>`
+          );
 
           membership.fiveDayReminderSent = true;
           await membership.save();
@@ -423,30 +456,28 @@ await logDM(
 
         if (user) {
           await user.send(
-            `**Hey ${user.username}! 👋**
-
-Your **${membership.type === 'monthly'
-              ? 'Monthly Membership'
-              : 'Yearly Membership'}** will expire **tomorrow**.
-
-**Expires:** <t:${Math.floor(
+            `**Hey ${user.username}! 👋**\n\n` +
+            `Your **${
+              membership.type === 'monthly'
+                ? 'Monthly Membership'
+                : 'Yearly Membership'
+            }** will expire **tomorrow**.\n\n` +
+            `**Expires:** <t:${Math.floor(
               membership.expiresAt.getTime() / 1000
-            )}:F>
-
-To keep your membership active without interruption, please **DM Ace** today to renew it.
-
-Thank you for supporting **Ace's Apex**! ❤️`
+            )}:F>\n\n` +
+            `To keep your membership active without interruption, please **DM Ace** today to renew it.\n\n` +
+            `Thank you for supporting **Ace's Apex**! ❤️`
           );
 
-await logDM(
-  client,
-  '1-Day Reminder',
-  null,
-  user,
-  `Membership expires on <t:${Math.floor(
-    membership.expiresAt.getTime() / 1000
-  )}:F>`
-);
+          await logDM(
+            client,
+            '1-Day Reminder',
+            null,
+            user,
+            `Membership expires on <t:${Math.floor(
+              membership.expiresAt.getTime() / 1000
+            )}:F>`
+          );
 
           membership.oneDayReminderSent = true;
           await membership.save();
@@ -460,52 +491,68 @@ await logDM(
         expiresIn <= 0 &&
         !membership.expiryReminderSent
       ) {
-        const guild = await client.guilds
-          .fetch(membership.guildId)
-          .catch(() => null);
+        // ----------------------------------------
+        // REMOVE ROLE USING REST API
+        // No GuildMembers intent required
+        // ----------------------------------------
+        if (membership.roleId) {
+          try {
+            await client.rest.delete(
+              Routes.guildMemberRole(
+                membership.guildId,
+                membership.userId,
+                membership.roleId
+              )
+            );
 
-        if (guild && membership.roleId) {
-          const member = await guild.members
-            .fetch(membership.userId)
-            .catch(() => null);
-
-          if (member) {
-            await member.roles.remove(membership.roleId);
+            console.log(
+              `✅ Membership role removed from ${membership.userId}`
+            );
+          } catch (error) {
+            console.error(
+              `Failed to remove membership role from ${membership.userId}:`,
+              error
+            );
           }
         }
 
+        // ----------------------------------------
+        // EXPIRY DM
+        // ----------------------------------------
         const user = await client.users
           .fetch(membership.userId)
           .catch(() => null);
 
         if (user) {
           await user.send(
-            `**Hey ${user.username}! 👋**
-
-Your **${membership.type === 'monthly'
-              ? 'Monthly Membership'
-              : 'Yearly Membership'}** has now expired.
-
-Your membership benefits have been removed.
-
-If you'd like to become a member again, please **DM Ace** to renew your membership.
-
-Thank you for supporting **Ace's Apex**! ❤️`
+            `**Hey ${user.username}! 👋**\n\n` +
+            `Your **${
+              membership.type === 'monthly'
+                ? 'Monthly Membership'
+                : 'Yearly Membership'
+            }** has now expired.\n\n` +
+            `Your membership benefits have been removed.\n\n` +
+            `If you'd like to become a member again, please **DM Ace** to renew your membership.\n\n` +
+            `Thank you for supporting **Ace's Apex**! ❤️`
           );
 
-await logDM(
-    client,
-    'Membership Expired',
-    null,
-    user,
-    `Membership expired on <t:${Math.floor(
-      membership.expiresAt.getTime() / 1000
-    )}:F>`
-  );
+          await logDM(
+            client,
+            'Membership Expired',
+            null,
+            user,
+            `Membership expired on <t:${Math.floor(
+              membership.expiresAt.getTime() / 1000
+            )}:F>`
+          );
         }
 
+        // ----------------------------------------
+        // MARK MEMBERSHIP AS EXPIRED
+        // ----------------------------------------
         membership.expiryReminderSent = true;
         membership.roleId = null;
+
         await membership.save();
 
         console.log(

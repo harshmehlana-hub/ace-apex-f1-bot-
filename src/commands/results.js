@@ -165,16 +165,31 @@ export default {
       );
 
       race.status = 'completed';
-      await race.save();
+      
 
       const topPredictorIds = scores
-        .slice(0, 5)
-        .map(s => s.userId);
+  .slice(0, 5)
+  .map(s => s.userId);
 
-      await updatePredictorOfTheWeekRole(
-        interaction.guild,
-        topPredictorIds
-      );
+// Get the previous Predictor of the Week users
+const previousRace = await Race.findOne({
+  season: race.season,
+  status: 'completed',
+  _id: { $ne: race._id },
+}).sort({ createdAt: -1 });
+
+const previousPredictorIds =
+  previousRace?.predictorOfTheWeekIds || [];
+
+await updatePredictorOfTheWeekRole(
+  interaction.guild,
+  topPredictorIds,
+  previousPredictorIds
+);
+
+// Save the new Predictor of the Week users
+race.predictorOfTheWeekIds = topPredictorIds;
+await race.save();
 
       try {
         const resultsChannel = await client.channels.fetch(

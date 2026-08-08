@@ -1,30 +1,65 @@
+import { Routes } from 'discord.js';
 import { config } from '../config.js';
 
-export async function updatePredictorOfTheWeekRole(guild, topPredictorIds) {
-  const role = await guild.roles.fetch(config.roles.predictor);
-  if (!role) {
-    console.error('Predictor of the Week role not found');
+export async function updatePredictorOfTheWeekRole(
+  guild,
+  topPredictorIds,
+  previousPredictorIds = []
+) {
+  const roleId = config.roles.predictor;
+
+  if (!roleId) {
+    console.error('Predictor of the Week role ID is not configured.');
     return;
   }
-  
-  // Remove role from all current holders
-  const membersWithRole = role.members;
-  for (const [, member] of membersWithRole) {
+
+  const top5 = topPredictorIds.slice(0, 5);
+
+  // Remove the role from the previous top 5
+  for (const userId of previousPredictorIds) {
+    if (top5.includes(userId)) {
+      continue;
+    }
+
     try {
-      await member.roles.remove(role);
+      await guild.client.rest.delete(
+        Routes.guildMemberRole(
+          guild.id,
+          userId,
+          roleId
+        )
+      );
+
+      console.log(
+        `Predictor of the Week role removed from ${userId}`
+      );
     } catch (error) {
-      console.error(`Failed to remove role from ${member.user.tag}:`, error);
+      console.error(
+        `Failed to remove Predictor of the Week role from ${userId}:`,
+        error
+      );
     }
   }
-  
-  // Add role to top 5 predictors
-  const top5 = topPredictorIds.slice(0, 5);
+
+  // Add the role to the new top 5
   for (const userId of top5) {
     try {
-      const member = await guild.members.fetch(userId);
-      await member.roles.add(role);
+      await guild.client.rest.put(
+        Routes.guildMemberRole(
+          guild.id,
+          userId,
+          roleId
+        )
+      );
+
+      console.log(
+        `Predictor of the Week role assigned to ${userId}`
+      );
     } catch (error) {
-      console.error(`Failed to add role to user ${userId}:`, error);
+      console.error(
+        `Failed to add Predictor of the Week role to ${userId}:`,
+        error
+      );
     }
   }
 }

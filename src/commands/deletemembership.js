@@ -1,6 +1,7 @@
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
+  Routes,
 } from 'discord.js';
 
 import { Membership } from '../database/models/Membership.js';
@@ -23,7 +24,10 @@ export default {
       PermissionFlagsBits.Administrator
     ),
 
-  async execute(interaction) {
+  async execute(interaction, client) {
+    // ----------------------------------------
+    // ADMIN CHECK
+    // ----------------------------------------
     if (!isAdmin(interaction.member, config.roles.admin)) {
       return interaction.reply({
         content:
@@ -32,44 +36,73 @@ export default {
       });
     }
 
-    const member = interaction.options.getMember('user');
+    // ----------------------------------------
+    // GET USER
+    // ----------------------------------------
+    const user = interaction.options.getUser('user');
 
-    if (!member) {
+    if (!user) {
       return interaction.reply({
-        content: '❌ Member not found.',
+        content: '❌ User not found.',
         ephemeral: true,
       });
     }
 
+    // ----------------------------------------
+    // FIND MEMBERSHIP
+    // ----------------------------------------
     const membership = await Membership.findOne({
-      userId: member.id,
+      userId: user.id,
     });
 
     if (!membership) {
       return interaction.reply({
-        content: '❌ This user does not have an active membership.',
+        content:
+          '❌ This user does not have an active membership.',
         ephemeral: true,
       });
     }
 
-    // Remove the Discord role if it still exists
+    // ----------------------------------------
+    // REMOVE DISCORD ROLE
+    // Uses REST API — no GuildMembers intent required
+    // ----------------------------------------
     if (membership.roleId) {
-      const role = interaction.guild.roles.cache.get(
-        membership.roleId
-      );
+      try {
+        await client.rest.delete(
+          Routes.guildMemberRole(
+            interaction.guild.id,
+            user.id,
+            membership.roleId
+          )
+        );
 
-      if (role && member.roles.cache.has(role.id)) {
-        await member.roles.remove(role);
+        console.log(
+          `✅ Membership role ${membership.roleId} removed from ${user.id}`
+        );
+      } catch (error) {
+        console.error(
+          '❌ Failed to remove membership role:',
+          error
+        );
+
+        // If the role/member is already gone, we still
+        // continue deleting the MongoDB membership.
       }
     }
 
-    // Delete the membership from MongoDB
+    // ----------------------------------------
+    // DELETE MEMBERSHIP FROM MONGODB
+    // ----------------------------------------
     await membership.deleteOne();
 
+    // ----------------------------------------
+    // CONFIRM
+    // ----------------------------------------
     await interaction.reply({
       content:
         `✅ Membership deleted successfully.\n\n` +
-        `👤 Member: ${member}`,
+        `👤 Member: ${user}`,
       ephemeral: true,
     });
   },
