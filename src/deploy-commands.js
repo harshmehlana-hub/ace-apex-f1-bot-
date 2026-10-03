@@ -49,6 +49,7 @@ membershipinfoCommand.data.toJSON(),
 deletemembershipCommand.data.toJSON(),
 privacyCommand.data.toJSON(),
 dmCommand.data.toJSON(),
+  purchasemembershipCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);
