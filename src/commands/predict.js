@@ -178,9 +178,11 @@ await standing.save();
       await User.findOneAndUpdate(
         { discordId: interaction.user.id },
         {
+          $set: {
+            username: interaction.user.username,
+          },
           $setOnInsert: {
             discordId: interaction.user.id,
-            username: interaction.user.username,
           },
         },
         { upsert: true }
