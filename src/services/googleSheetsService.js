@@ -137,13 +137,15 @@ async function supporterRow(title, username, payer) {
 async function raceRow(title, username) {
   const rows = await values(title, 'A4:A5000');
   const target = norm(username);
-  let empty = null;
+  let lastUsedRow = 3;
+
   for (let i = 0; i < rows.length; i += 1) {
     const existing = String(rows[i]?.[0] || '').trim();
     if (target && norm(existing) === target) return i + 4;
-    if (empty === null && !existing) empty = i + 4;
+    if (existing) lastUsedRow = i + 4;
   }
-  const row = empty || rows.length + 4;
+
+  const row = lastUsedRow + 1;
   await write(title, `A${row}`, username);
   return row;
 }
