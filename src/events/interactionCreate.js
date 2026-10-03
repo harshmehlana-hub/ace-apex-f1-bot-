@@ -6,7 +6,7 @@ import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
-    if (interaction.isButton()) {
+    if (interaction.isButton() || interaction.isStringSelectMenu()) {
       const purchaseButton = Object.values(purchasePrefixes).some(prefix =>
         interaction.customId?.startsWith(prefix + ':')
       );
