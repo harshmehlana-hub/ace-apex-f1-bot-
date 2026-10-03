@@ -9,6 +9,8 @@ import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createP
 import { Prediction } from '../database/models/Prediction.js';
 import { getCurrentSeason } from './seasonService.js';
 import { processRacePasses } from './racePassService.js';
+import { PaymentVerification } from '../database/models/PaymentVerification.js';
+import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 
 let schedulerRunning = false;
 
@@ -23,6 +25,7 @@ export function setupScheduler(client) {
         processReminders(client),
         processMemberships(client),
         processRacePasses(client),
+        processGoogleSheetSync(client),
       ]);
     } finally {
       schedulerRunning = false;
@@ -155,6 +158,22 @@ async function processReminders(client) {
     } catch (error) {
       await Reminder.updateOne({ _id: reminder._id }, { $set: { sent: false } });
       console.error('Failed to send reminder:', error);
+    }
+  }
+}
+
+async function processGoogleSheetSync(client) {
+  const payments = await PaymentVerification.find({
+    status: 'verified',
+    sheetSyncStatus: { $in: ['pending', 'failed'] },
+  }).sort({ updatedAt: 1 }).limit(20);
+
+  for (const payment of payments) {
+    try {
+      const user = await client.users.fetch(payment.userId);
+      await syncVerifiedPaymentToSheet(payment, user);
+    } catch (error) {
+      console.error(`Failed to retry Google Sheet sync for ${payment.requestId}:`, error);
     }
   }
 }
