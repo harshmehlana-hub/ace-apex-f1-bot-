@@ -334,4 +334,4 @@ async function rejectPayment(interaction, client, requestId) {
   await interaction.followUp({ content: '❌ Payment request rejected. The user was notified.', ephemeral: true });
 }
 
-export const purchasePrefixes = { COUNTRY_PREFIX, TYPE_PREFIX, PAID_PREFIX, VERIFY_PREFIX, REJECT_PREFIX };
+export const purchasePrefixes = { COUNTRY_PREFIX, TYPE_PREFIX, PAID_PREFIX, VERIFY_PREFIX, REJECT_PREFIX, RACE_SELECT_PREFIX };
