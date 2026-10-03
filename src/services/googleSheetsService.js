@@ -122,14 +122,16 @@ async function blue(sheetId, rowIndex, columnIndex) {
 async function supporterRow(title, username, payer) {
   const rows = await values(title, 'A4:B5000');
   const target = norm(username);
-  let empty = null;
+  let lastUsedRow = 3;
+
   for (let i = 0; i < rows.length; i += 1) {
     const name = String(rows[i]?.[0] || '').trim();
     const existing = String(rows[i]?.[1] || '').trim();
     if (target && norm(existing) === target) return i + 4;
-    if (empty === null && !name && !existing) empty = i + 4;
+    if (name || existing) lastUsedRow = i + 4;
   }
-  const row = empty || rows.length + 4;
+
+  const row = lastUsedRow + 1;
   await write(title, `A${row}:B${row}`, [[payer, username]]);
   return row;
 }
