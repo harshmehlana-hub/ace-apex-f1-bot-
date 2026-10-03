@@ -6,19 +6,23 @@ import {
   ButtonStyle,
   EmbedBuilder,
   ModalBuilder,
+  StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
 import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { config } from '../config.js';
 import { membershipPayments } from '../config/membershipPayments.js';
+import { getAvailableRacePasses, getRacePass } from '../config/racePasses2026.js';
 import { grantMembership, MEMBERSHIP_DETAILS } from './membershipService.js';
+import { createRacePass } from './racePassService.js';
 
 const COUNTRY_PREFIX = 'purchase_country';
 const TYPE_PREFIX = 'purchase_type';
 const PAID_PREFIX = 'purchase_paid';
 const VERIFY_PREFIX = 'membership_verify';
 const REJECT_PREFIX = 'membership_reject';
+const RACE_SELECT_PREFIX = 'purchase_race_select';
 
 function money(payment) {
   return payment.currency === 'INR' ? '₹' + payment.amount : '$' + payment.amount.toFixed(2);
@@ -52,6 +56,37 @@ export async function startPurchase(interaction, client) {
   }
 }
 
+async function showMembershipPayment(interaction, country, type, raceKey = null) {
+  const payment = membershipPayments[country]?.[type];
+  if (!payment) return;
+  const race = raceKey ? getRacePass(raceKey) : null;
+  const paidId = PAID_PREFIX + ':' + country + ':' + type + (raceKey ? ':' + raceKey : '');
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder().setCustomId(paidId).setLabel('I have paid').setStyle(ButtonStyle.Success)
+  );
+  const raceText = race
+    ? '\n\n**Race:** ' + race.name +
+      '\n**Race weekend starts:** <t:' + Math.floor(race.weekendStartAt.getTime() / 1000) + ':F>' +
+      '\n**Pass expiry:** <t:' + Math.floor(race.expiryAt.getTime() / 1000) + ':F>'
+    : '';
+
+  if (country === 'international') {
+    row.addComponents(new ButtonBuilder().setLabel('Pay with PayPal').setStyle(ButtonStyle.Link).setURL(payment.paypalUrl));
+    await interaction.update({
+      content: '## ' + payment.label + raceText + '\n\n**Price:** ' + money(payment) + '\n\n1. Click **Pay with PayPal**.\n2. Complete the payment.\n3. Click **I have paid** and enter the payer name shown on PayPal.\n\n⚠️ Clicking **I have paid** only sends a verification request. Membership is granted only after an admin verifies the payment.',
+      components: [row],
+    });
+    return;
+  }
+
+  const attachment = new AttachmentBuilder(Buffer.from(payment.qrBase64, 'base64'), { name: 'ace-apex-' + type + '-qr.png' });
+  await interaction.update({
+    content: '## ' + payment.label + raceText + '\n\n**Price:** ' + money(payment) + '\n\nScan the QR code below using any UPI app, complete the payment, then click **I have paid**.\n\n⚠️ Your payment will be manually verified before membership is granted.',
+    files: [attachment],
+    components: [row],
+  });
+}
+
 export async function handlePurchaseInteraction(interaction, client) {
   const id = interaction.customId || '';
 
@@ -73,33 +108,50 @@ export async function handlePurchaseInteraction(interaction, client) {
     const [, country, type] = id.split(':');
     const payment = membershipPayments[country]?.[type];
     if (!payment) return;
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(PAID_PREFIX + ':' + country + ':' + type).setLabel('I have paid').setStyle(ButtonStyle.Success)
-    );
 
-    if (country === 'international') {
-      row.addComponents(new ButtonBuilder().setLabel('Pay with PayPal').setStyle(ButtonStyle.Link).setURL(payment.paypalUrl));
+    if (type === 'race') {
+      const races = getAvailableRacePasses();
+      if (!races.length) {
+        await interaction.update({ content: '🏁 No Race Pass is currently available for purchase.\n\nRace Passes open 7 days before a race weekend and remain available until the scheduled Grand Prix begins.', components: [] });
+        return;
+      }
+      const menu = new StringSelectMenuBuilder()
+        .setCustomId(RACE_SELECT_PREFIX + ':' + country)
+        .setPlaceholder('Select the F1 race')
+        .addOptions(races.slice(0, 25).map((race) => ({
+          label: race.name,
+          value: race.key,
+          description: race.raceStartAt.toLocaleString('en-GB', { timeZone: race.timezone, dateStyle: 'medium', timeStyle: 'short' }),
+        })));
       await interaction.update({
-        content: '## ' + payment.label + '\n\n**Price:** ' + money(payment) + '\n\n1. Click **Pay with PayPal**.\n2. Complete the payment.\n3. Click **I have paid** and enter the payer name shown on PayPal.\n\n⚠️ Clicking **I have paid** only sends a verification request. Membership is granted only after an admin verifies the payment.',
-        components: [row],
+        content: '## 🏁 Choose your Race Pass\n\nSelect the specific F1 race you want your pass for.\n\n**Price:** ' + money(payment) + '\n\nThe pass activates when that race weekend begins and expires 5 hours after the scheduled race end.',
+        components: [new ActionRowBuilder().addComponents(menu)],
       });
       return;
     }
 
-    const attachment = new AttachmentBuilder(Buffer.from(payment.qrBase64, 'base64'), { name: 'ace-apex-' + type + '-qr.png' });
-    await interaction.update({
-      content: '## ' + payment.label + '\n\n**Price:** ' + money(payment) + '\n\nScan the QR code below using any UPI app, complete the payment, then click **I have paid**.\n\n⚠️ Your payment will be manually verified before membership is granted.',
-      files: [attachment],
-      components: [row],
-    });
+    await showMembershipPayment(interaction, country, type);
+    return;
+  }
+
+  if (id.startsWith(RACE_SELECT_PREFIX + ':')) {
+    const [, country] = id.split(':');
+    const raceKey = interaction.values?.[0];
+    const race = getRacePass(raceKey);
+    if (!race || !getAvailableRacePasses().some((item) => item.key === raceKey)) {
+      await interaction.update({ content: '⚠️ That Race Pass is no longer available. Please start the membership purchase again.', components: [] });
+      return;
+    }
+    await showMembershipPayment(interaction, country, 'race', raceKey);
     return;
   }
 
   if (id.startsWith(PAID_PREFIX + ':')) {
-    const [, country, type] = id.split(':');
+    const [, country, type, raceKey] = id.split(':');
     if (!membershipPayments[country]?.[type]) return;
+    if (type === 'race' && (!raceKey || !getRacePass(raceKey))) return;
     const modal = new ModalBuilder()
-      .setCustomId(PAID_PREFIX + ':' + country + ':' + type)
+      .setCustomId(PAID_PREFIX + ':' + country + ':' + type + (raceKey ? ':' + raceKey : ''))
       .setTitle('Confirm your payment');
     const payerName = new TextInputBuilder()
       .setCustomId('payer_name')
@@ -126,7 +178,7 @@ export async function handlePurchaseInteraction(interaction, client) {
 export async function handlePurchaseModal(interaction, client) {
   const id = interaction.customId || '';
   if (!id.startsWith(PAID_PREFIX + ':')) return false;
-  const [, country, type] = id.split(':');
+  const [, country, type, raceKey] = id.split(':');
   const payment = membershipPayments[country]?.[type];
   if (!payment) return true;
 
@@ -134,6 +186,8 @@ export async function handlePurchaseModal(interaction, client) {
   const payerName = interaction.fields.getTextInputValue('payer_name').trim();
   if (!payerName) return interaction.editReply('❌ Please enter the payer name.');
 
+  if (type === 'race' && (!raceKey || !getAvailableRacePasses().some((race) => race.key === raceKey))) return interaction.editReply('⚠️ That Race Pass is no longer available for purchase.');
+  const selectedRace = raceKey ? getRacePass(raceKey) : null;
   const existing = await PaymentVerification.findOne({ userId: interaction.user.id, status: 'pending' });
   if (existing) return interaction.editReply('⚠️ You already have a payment verification request pending. Please wait for an admin to verify it.');
 
@@ -146,6 +200,8 @@ export async function handlePurchaseModal(interaction, client) {
     amount: payment.amount,
     currency: payment.currency,
     payerName,
+    raceKey: selectedRace?.key || null,
+    raceName: selectedRace?.name || null,
     status: 'pending',
   });
 
@@ -159,6 +215,7 @@ export async function handlePurchaseModal(interaction, client) {
       .addFields(
         { name: '👤 User', value: interaction.user.tag + '\n`' + interaction.user.id + '`', inline: true },
         { name: '🎟️ Membership', value: MEMBERSHIP_DETAILS[type].name, inline: true },
+        ...(selectedRace ? [{ name: '🏁 Race', value: selectedRace.name, inline: true }] : []),
         { name: '💰 Amount', value: money(payment), inline: true },
         { name: '🌍 Payment region', value: country === 'india' ? 'India / UPI' : 'International / PayPal', inline: true },
         { name: '🧾 Payer name', value: payerName, inline: true },
@@ -198,15 +255,11 @@ async function verifyPayment(interaction, client, requestId) {
 
   try {
     user = await client.users.fetch(request.userId);
-    result = await grantMembership({
-      client,
-      guild: interaction.guild,
-      user,
-      type: request.type,
-      grantedBy: interaction.user,
-      source: 'Manual payment verification',
-      paymentRequest: request,
-    });
+    if (request.type === 'race') {
+      result = await createRacePass({ client, guild: interaction.guild, user, paymentRequest: request, raceKey: request.raceKey });
+    } else {
+      result = await grantMembership({ client, guild: interaction.guild, user, type: request.type, grantedBy: interaction.user, source: 'Manual payment verification', paymentRequest: request });
+    }
 
     request.status = 'verified';
     request.verifiedAt = new Date();
@@ -228,10 +281,11 @@ async function verifyPayment(interaction, client, requestId) {
     await interaction.message.edit({
       embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle('✅ Membership Payment Verified & Granted').setTimestamp().addFields(
         { name: '👤 User', value: user.tag + '\n`' + user.id + '`', inline: true },
-        { name: '🎟️ Membership', value: result.membershipName, inline: true },
+        { name: '🎟️ Membership', value: result.membershipName || 'Race Pass', inline: true },
         { name: '💰 Amount', value: request.currency + ' ' + request.amount, inline: true },
         { name: '🧾 Payer name', value: request.payerName, inline: true },
         { name: '👮 Verified by', value: interaction.user.tag, inline: true },
+        ...(request.raceName ? [{ name: '🏁 Race', value: request.raceName, inline: true }] : []),
         { name: '⏰ Expires', value: '<t:' + Math.floor(result.expiry.getTime() / 1000) + ':F>', inline: true },
       )],
       components: [],
