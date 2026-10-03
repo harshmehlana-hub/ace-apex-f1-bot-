@@ -97,7 +97,7 @@ async function write(title, range, value) {
   const id = env('GOOGLE_SHEETS_SPREADSHEET_ID');
   const a1 = encodeURIComponent(`'${title}'!${range}`);
   const data = Array.isArray(value) ? value : [[value]];
-  await request(`/${encodeURIComponent(id)}/values/${a1}?valueInputOption=USER_ENTERED`, {
+  await request(`/${encodeURIComponent(id)}/values/${a1}?valueInputOption=RAW`, {
     method: 'PUT',
     body: JSON.stringify({ values: data }),
   });
