@@ -38,7 +38,6 @@ import { runDataMigrations } from './services/dataMigrationService.js';
 import readyEvent from './events/ready.js';
 import interactionCreateEvent from './events/interactionCreate.js';
 import userUpdateEvent from './events/userUpdate.js';
-import { handlePurchaseInteraction, handlePurchaseModal } from './services/purchaseMembershipService.js';
 
 const client = new Client({
   intents: [
@@ -78,6 +77,7 @@ membershipinfoCommand,
 deletemembershipCommand,
 privacyCommand,
 dmCommand,
+  purchasemembershipCommand,
 ];
 
 for (const command of commands) {
