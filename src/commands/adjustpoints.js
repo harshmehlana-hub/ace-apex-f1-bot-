@@ -17,7 +17,13 @@ export default {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
-    if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
+    if (!isAdmin(interaction.member, config.roles.admin)) {
+      return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
+    }
+
+    // Point reconciliation can take longer than Discord's initial 3-second response window.
+    // Acknowledge immediately, then edit the response when the adjustment is complete.
+    await interaction.deferReply({ ephemeral: true });
     const targetUser = interaction.options.getUser('user');
     const requestedPoints = interaction.options.getInteger('points');
     const reason = interaction.options.getString('reason') || 'No reason provided';
@@ -28,7 +34,7 @@ export default {
     let amount = requestedPoints;
     if (currentStanding.totalPoints + amount < 0) amount = -currentStanding.totalPoints;
 
-    if (amount === 0) return interaction.reply({ content: '❌ This adjustment would not change the user\'s season score.', ephemeral: true });
+    if (amount === 0) return interaction.editReply({ content: '❌ This adjustment would not change the user\'s season score.' });
 
     await runInTransaction(async session => {
       await PointTransaction.create([{
@@ -49,6 +55,6 @@ export default {
       if (logsChannel) await logsChannel.send(`📝 **Points Adjusted**\n👤 User: <@${targetUser.id}>\n⚙️ Admin: <@${interaction.user.id}>\n📈 Change: ${amount > 0 ? '+' : ''}${amount}\n🏆 Season ${season}: ${currentStanding.totalPoints} → ${updated.totalPoints}\n📄 Reason: ${reason}`);
     } catch (error) { console.error('Failed to send log message:', error); }
 
-    await interaction.reply({ content: `✅ **Season points updated**\n\n👤 User: <@${targetUser.id}>\n📅 Season: ${season}\n📈 Change: ${amount > 0 ? '+' : ''}${amount}\n🏆 Total: ${currentStanding.totalPoints} → ${updated.totalPoints}\n📄 Reason: ${reason}`, ephemeral: true });
+    await interaction.editReply({ content: `✅ **Season points updated**\n\n👤 User: <@${targetUser.id}>\n📅 Season: ${season}\n📈 Change: ${amount > 0 ? '+' : ''}${amount}\n🏆 Total: ${currentStanding.totalPoints} → ${updated.totalPoints}\n📄 Reason: ${reason}` });
   },
 };
