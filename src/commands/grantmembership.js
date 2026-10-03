@@ -35,11 +35,11 @@ export default {
       });
 
       await interaction.reply({
-        content: '✅ Membership granted successfully!\\n\\n' +
-          '👤 Member: ' + user + '\\n' +
-          '🎟️ Type: ' + result.membershipName + '\\n' +
-          '⏰ Expires:\\n' +
-          '<t:' + Math.floor(result.expiry.getTime() / 1000) + ':F>\\n' +
+        content: '✅ Membership granted successfully!\n\n' +
+          '👤 Member: ' + user + '\n' +
+          '🎟️ Type: ' + result.membershipName + '\n' +
+          '⏰ Expires:\n' +
+          '<t:' + Math.floor(result.expiry.getTime() / 1000) + ':F>\n' +
           '<t:' + Math.floor(result.expiry.getTime() / 1000) + ':R>',
         ephemeral: true,
       });
