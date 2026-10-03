@@ -1,15 +1,19 @@
 import { auditAdminCommand } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
-import { handlePurchaseInteraction, handlePurchaseModal } from '../services/purchaseMembershipService.js';
+import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from '../services/purchaseMembershipService.js';
 
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
     if (interaction.isButton()) {
+      const purchaseButton = Object.values(purchasePrefixes).some(prefix =>
+        interaction.customId?.startsWith(prefix + ':')
+      );
+      if (!purchaseButton) return;
+
       try {
-        const handled = await handlePurchaseInteraction(interaction, client);
-        if (handled) return;
+        await handlePurchaseInteraction(interaction, client);
       } catch (error) {
         console.error('Error handling membership purchase button:', error);
         if (!interaction.replied && !interaction.deferred) {
@@ -20,9 +24,11 @@ export default {
     }
 
     if (interaction.isModalSubmit()) {
+      const purchaseModal = interaction.customId?.startsWith(purchasePrefixes.PAID_PREFIX + ':');
+      if (!purchaseModal) return;
+
       try {
-        const handled = await handlePurchaseModal(interaction, client);
-        if (handled) return;
+        await handlePurchaseModal(interaction, client);
       } catch (error) {
         console.error('Error handling membership purchase modal:', error);
         if (interaction.deferred || interaction.replied) {
