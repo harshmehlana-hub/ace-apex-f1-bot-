@@ -24,6 +24,14 @@ const paymentVerificationSchema = new mongoose.Schema({
     enum: ['race', 'monthly', 'yearly'],
     required: true,
   },
+  raceKey: {
+    type: String,
+    default: null,
+  },
+  raceName: {
+    type: String,
+    default: null,
+  },
   amount: {
     type: Number,
     required: true,
