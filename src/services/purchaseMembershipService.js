@@ -32,7 +32,7 @@ function typeButton(country, type) {
 }
 
 export async function startPurchase(interaction, client) {
-  const pending = await PaymentVerification.findOne({ userId: interaction.user.id, status: 'pending' });
+  const pending = await PaymentVerification.findOne({ userId: interaction.user.id, status: { $in: ['pending', 'processing'] } });
   if (pending) {
     return interaction.reply({ content: '⚠️ You already have a payment verification request pending. Please wait for an admin to verify it.', ephemeral: true });
   }
