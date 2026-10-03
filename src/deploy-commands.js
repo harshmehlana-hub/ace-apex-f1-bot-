@@ -24,6 +24,7 @@ import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js'
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
+import purchasemembershipCommand from './commands/purchasemembership.js';
 
 const commands = [
   predictCommand.data.toJSON(),
