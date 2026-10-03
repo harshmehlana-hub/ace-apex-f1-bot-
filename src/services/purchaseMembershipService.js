@@ -193,9 +193,12 @@ async function verifyPayment(interaction, client, requestId) {
   );
   if (!request) return interaction.followUp({ content: '⚠️ This request has already been processed.', ephemeral: true });
 
+  let user;
+  let result;
+
   try {
-    const user = await client.users.fetch(request.userId);
-    const result = await grantMembership({
+    user = await client.users.fetch(request.userId);
+    result = await grantMembership({
       client,
       guild: interaction.guild,
       user,
@@ -204,9 +207,24 @@ async function verifyPayment(interaction, client, requestId) {
       source: 'Manual payment verification',
       paymentRequest: request,
     });
+
     request.status = 'verified';
     request.verifiedAt = new Date();
     await request.save();
+  } catch (error) {
+    await PaymentVerification.updateOne(
+      { _id: request._id, status: 'processing' },
+      { $set: { status: 'pending', verifiedBy: null } }
+    );
+    console.error('Failed to verify membership payment:', error);
+    await interaction.followUp({
+      content: '❌ Membership could not be granted: ' + (error?.message || 'Unknown error') + '. The request remains pending.',
+      ephemeral: true,
+    });
+    return;
+  }
+
+  try {
     await interaction.message.edit({
       embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle('✅ Membership Payment Verified & Granted').setTimestamp().addFields(
         { name: '👤 User', value: user.tag + '\n`' + user.id + '`', inline: true },
@@ -218,12 +236,14 @@ async function verifyPayment(interaction, client, requestId) {
       )],
       components: [],
     });
-    await interaction.followUp({ content: '✅ Payment verified and membership granted. The user was DMd and the grant was logged.', ephemeral: true });
   } catch (error) {
-    await PaymentVerification.updateOne({ _id: request._id }, { $set: { status: 'pending', verifiedBy: null } });
-    console.error('Failed to verify membership payment:', error);
-    await interaction.followUp({ content: '❌ Membership could not be granted: ' + (error?.message || 'Unknown error') + '. The request remains pending.', ephemeral: true });
+    console.error('Failed to update payment verification log message:', error);
   }
+
+  await interaction.followUp({
+    content: '✅ Payment verified and membership granted. The user was DMd and the grant was logged.',
+    ephemeral: true,
+  });
 }
 
 async function rejectPayment(interaction, client, requestId) {
