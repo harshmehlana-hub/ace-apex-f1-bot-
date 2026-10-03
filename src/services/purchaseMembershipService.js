@@ -16,6 +16,7 @@ import { membershipPayments } from '../config/membershipPayments.js';
 import { getAvailableRacePasses, getRacePass } from '../config/racePasses2026.js';
 import { grantMembership, MEMBERSHIP_DETAILS } from './membershipService.js';
 import { createRacePass } from './racePassService.js';
+import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 
 const COUNTRY_PREFIX = 'purchase_country';
 const TYPE_PREFIX = 'purchase_type';
@@ -264,6 +265,7 @@ async function verifyPayment(interaction, client, requestId) {
     request.status = 'verified';
     request.verifiedAt = new Date();
     await request.save();
+    await syncVerifiedPaymentToSheet(request, user);
   } catch (error) {
     await PaymentVerification.updateOne(
       { _id: request._id, status: 'processing' },
