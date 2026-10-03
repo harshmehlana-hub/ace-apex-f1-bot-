@@ -1,10 +1,38 @@
 import { auditAdminCommand } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { handlePurchaseInteraction, handlePurchaseModal } from '../services/purchaseMembershipService.js';
 
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
+    if (interaction.isButton()) {
+      try {
+        const handled = await handlePurchaseInteraction(interaction, client);
+        if (handled) return;
+      } catch (error) {
+        console.error('Error handling membership purchase button:', error);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '❌ Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
+
+    if (interaction.isModalSubmit()) {
+      try {
+        const handled = await handlePurchaseModal(interaction, client);
+        if (handled) return;
+      } catch (error) {
+        console.error('Error handling membership purchase modal:', error);
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ content: '❌ Something went wrong while submitting your payment details.' }).catch(() => {});
+        } else {
+          await interaction.reply({ content: '❌ Something went wrong while submitting your payment details.', ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
     // Handle slash commands.
     // Discord requires an interaction to be acknowledged quickly. If a command
     // takes longer than the normal response window, automatically defer it so
