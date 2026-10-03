@@ -45,10 +45,10 @@ export async function grantMembership({ client, guild, user, type, grantedBy, so
 
   try {
     await user.send(
-      '**Hey ' + user.username + '! 👋**\\n\\n' +
-      'Your membership is now active on the server.\\n\\n' +
-      '**Type:** ' + details.name + '\\n' +
-      '**Valid till:** <t:' + Math.floor(expiry.getTime() / 1000) + ':F>\\n\\n' +
+      '**Hey ' + user.username + '! 👋**\n\n' +
+      'Your membership is now active on the server.\n\n' +
+      '**Type:** ' + details.name + '\n' +
+      '**Valid till:** <t:' + Math.floor(expiry.getTime() / 1000) + ':F>\n\n' +
       'Thank you for supporting **Ace\'s Apex**! We truly appreciate your support. 🥳❤️'
     );
     await logDM(client, 'Membership Activated', grantedBy, user, 'Membership Type: ' + details.name);
@@ -69,11 +69,11 @@ async function logMembershipGrant(client, { guild, user, type, expiry, grantedBy
       .setTitle('🎟️ Membership Granted')
       .setTimestamp()
       .addFields(
-        { name: '👤 Member', value: user.tag + '\\n`' + user.id + '`', inline: true },
+        { name: '👤 Member', value: user.tag + '\n`' + user.id + '`', inline: true },
         { name: '🎟️ Membership', value: MEMBERSHIP_DETAILS[type].name, inline: true },
         { name: '⏰ Expires', value: '<t:' + Math.floor(expiry.getTime() / 1000) + ':F>', inline: true },
         { name: '🔧 Source', value: source, inline: true },
-        { name: '👮 Granted by', value: grantedBy.tag + '\\n`' + grantedBy.id + '`', inline: true },
+        { name: '👮 Granted by', value: grantedBy.tag + '\n`' + grantedBy.id + '`', inline: true },
       );
     if (paymentRequest) {
       embed.addFields(
