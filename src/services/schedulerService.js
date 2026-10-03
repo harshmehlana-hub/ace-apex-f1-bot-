@@ -8,6 +8,7 @@ import { config } from '../config.js';
 import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createPredictionStatisticsEmbed } from '../utils/embeds.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { getCurrentSeason } from './seasonService.js';
+import { processRacePasses } from './racePassService.js';
 
 let schedulerRunning = false;
 
@@ -21,6 +22,7 @@ export function setupScheduler(client) {
         updateQualifyingStatuses(client),
         processReminders(client),
         processMemberships(client),
+        processRacePasses(client),
       ]);
     } finally {
       schedulerRunning = false;
