@@ -7,20 +7,21 @@ export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
-      const purchaseButton = Object.values(purchasePrefixes).some(prefix =>
+      const purchaseInteraction = Object.values(purchasePrefixes).some(prefix =>
         interaction.customId?.startsWith(prefix + ':')
       );
-      if (!purchaseButton) return;
 
-      try {
-        await handlePurchaseInteraction(interaction, client);
-      } catch (error) {
-        console.error('Error handling membership purchase button:', error);
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: '❌ Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+      if (purchaseInteraction) {
+        try {
+          await handlePurchaseInteraction(interaction, client);
+        } catch (error) {
+          console.error('Error handling membership purchase interaction:', error);
+          if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '❌ Something went wrong. Please try again.', ephemeral: true }).catch(() => {});
+          }
         }
+        return;
       }
-      return;
     }
 
     if (interaction.isModalSubmit()) {
