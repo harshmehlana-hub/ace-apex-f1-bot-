@@ -49,7 +49,12 @@ export async function createRacePass({ client, guild, user, paymentRequest, race
   });
 
   if (racePass.status === 'active') {
-    await grantRacePassRole(client, racePass);
+    try {
+      await grantRacePassRole(client, racePass);
+    } catch (error) {
+      await RacePass.deleteOne({ _id: racePass._id });
+      throw error;
+    }
     try {
       await user.send('**🏁 Your Race Pass is active!**\n\n**Race:** ' + race.name + '\n**Valid until:** <t:' + Math.floor(race.expiryAt.getTime() / 1000) + ':F>\n\nEnjoy the race weekend with Ace\'s Apex! 🏎️');
     } catch (error) { console.error('Race Pass activation DM failed:', error); }
@@ -58,7 +63,7 @@ export async function createRacePass({ client, guild, user, paymentRequest, race
       await user.send('**🏁 Race Pass confirmed!**\n\n**Race:** ' + race.name + '\n**Access starts:** <t:' + Math.floor(race.activationAt.getTime() / 1000) + ':F>\n**Valid until:** <t:' + Math.floor(race.expiryAt.getTime() / 1000) + ':F>\n\nYour Race Pass will activate automatically when the race weekend begins.');
     } catch (error) { console.error('Race Pass confirmation DM failed:', error); }
   }
-  return racePass;
+  return { racePass, expiry: racePass.expiresAt, membershipName: 'Race Pass' };
 }
 
 export async function processRacePasses(client) {
