@@ -36,6 +36,7 @@ import { runDataMigrations } from './services/dataMigrationService.js';
 // Import events
 import readyEvent from './events/ready.js';
 import interactionCreateEvent from './events/interactionCreate.js';
+import userUpdateEvent from './events/userUpdate.js';
 
 const client = new Client({
   intents: [
@@ -84,6 +85,7 @@ for (const command of commands) {
 // Register events
 client.once('ready', () => readyEvent.execute(client));
 client.on('interactionCreate', (interaction) => interactionCreateEvent.execute(interaction, client));
+client.on('userUpdate', (oldUser, newUser) => userUpdateEvent.execute(oldUser, newUser, client));
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
