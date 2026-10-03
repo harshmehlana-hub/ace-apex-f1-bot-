@@ -69,6 +69,25 @@ const paymentVerificationSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  sheetSyncStatus: {
+    type: String,
+    enum: ['pending', 'syncing', 'synced', 'failed'],
+    default: 'pending',
+    required: true,
+  },
+  sheetSyncedAt: {
+    type: Date,
+    default: null,
+  },
+  sheetSyncAttempts: {
+    type: Number,
+    default: 0,
+  },
+  sheetSyncError: {
+    type: String,
+    default: null,
+    maxlength: 500,
+  },
 }, { timestamps: true });
 
 paymentVerificationSchema.index(
