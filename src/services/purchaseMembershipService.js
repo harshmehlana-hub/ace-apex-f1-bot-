@@ -152,7 +152,7 @@ export async function handlePurchaseInteraction(interaction, client) {
     if (!membershipPayments[country]?.[type]) return;
     if (type === 'race' && (!raceKey || !getRacePass(raceKey))) return;
     const modal = new ModalBuilder()
-      .setCustomId(PAID_PREFIX + ':' + country + ':' + type + (raceKey ? ':' + raceKey : ''))
+      .setCustomId(PAID_PREFIX + ':' + country + ':' + type + ':' + (raceKey || '') + ':' + interaction.message.id)
       .setTitle('Confirm your payment');
     const payerName = new TextInputBuilder()
       .setCustomId('payer_name')
@@ -179,7 +179,7 @@ export async function handlePurchaseInteraction(interaction, client) {
 export async function handlePurchaseModal(interaction, client) {
   const id = interaction.customId || '';
   if (!id.startsWith(PAID_PREFIX + ':')) return false;
-  const [, country, type, raceKey] = id.split(':');
+  const [, country, type, raceKey, messageId] = id.split(':');
   const payment = membershipPayments[country]?.[type];
   if (!payment) return true;
 
@@ -235,6 +235,30 @@ export async function handlePurchaseModal(interaction, client) {
   }
 
   await interaction.editReply('✅ Payment details submitted for manual verification.\n\nAn admin will check the payment and grant your membership if it is confirmed.');
+
+  if (messageId && interaction.channel?.messages) {
+    try {
+      const paymentMessage = await interaction.channel.messages.fetch(messageId);
+      const components = paymentMessage.components.map((row) => {
+        const rebuilt = new ActionRowBuilder();
+        const buttons = row.components
+          .filter((component) => component.type === 2)
+          .map((component) => {
+            const button = ButtonBuilder.from(component);
+            if (component.customId?.startsWith(PAID_PREFIX + ':')) {
+              button.setLabel('Payment submitted').setDisabled(true);
+            }
+            return button;
+          });
+        if (buttons.length) rebuilt.addComponents(buttons);
+        return rebuilt;
+      }).filter((row) => row.components.length);
+      await paymentMessage.edit({ components });
+    } catch (error) {
+      console.error('Failed to disable submitted payment button:', error);
+    }
+  }
+
   return true;
 }
 
