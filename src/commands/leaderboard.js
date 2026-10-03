@@ -18,7 +18,7 @@ export default {
   
   async execute(interaction) {
     const season = await getCurrentSeason();
-    const leaderboard = await getSeasonLeaderboard(season);
+    const leaderboard = await getSeasonLeaderboard(season, interaction.guild);
     
     if (leaderboard.length === 0) {
       return interaction.reply({
