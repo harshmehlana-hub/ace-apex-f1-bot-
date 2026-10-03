@@ -1,0 +1,90 @@
+import { Routes } from 'discord.js';
+import { RacePass } from '../database/models/RacePass.js';
+import { Membership } from '../database/models/Membership.js';
+import { config } from '../config.js';
+import { getRacePass } from '../config/racePasses2026.js';
+
+async function grantRacePassRole(client, racePass) {
+  const roleId = config.roles.racePass;
+  if (!roleId) throw new Error('Race Pass role is not configured.');
+  await client.rest.put(Routes.guildMemberRole(racePass.guildId, racePass.userId, roleId));
+}
+
+async function removeRacePassRoleIfUnused(client, racePass) {
+  const roleId = config.roles.racePass;
+  if (!roleId) return;
+  const now = new Date();
+  const anotherActive = await RacePass.exists({ userId: racePass.userId, status: 'active', expiresAt: { $gt: now }, _id: { $ne: racePass._id } });
+  const legacyMembership = await Membership.exists({ userId: racePass.userId, type: 'race', expiresAt: { $gt: now } });
+  if (!anotherActive && !legacyMembership) {
+    await client.rest.delete(Routes.guildMemberRole(racePass.guildId, racePass.userId, roleId)).catch((error) => {
+      if (error?.status !== 404) console.error('Failed to remove expired Race Pass role:', error);
+    });
+  }
+}
+
+export async function createRacePass({ client, guild, user, paymentRequest, raceKey }) {
+  const race = getRacePass(raceKey);
+  if (!race) throw new Error('The selected Race Pass race is no longer available.');
+  const now = new Date();
+  if (now < race.purchaseStartAt || now > race.purchaseEndAt) throw new Error('The purchase window for this Race Pass has closed.');
+  const existing = await RacePass.findOne({ userId: user.id, raceKey });
+  if (existing && existing.status !== 'cancelled') throw new Error('You already have a Race Pass for this race.');
+
+  const racePass = await RacePass.create({
+    userId: user.id,
+    guildId: guild.id,
+    raceKey: race.key,
+    raceName: race.name,
+    country: paymentRequest.country,
+    amount: paymentRequest.amount,
+    currency: paymentRequest.currency,
+    paymentRequestId: paymentRequest.requestId,
+    activationAt: race.activationAt,
+    raceStartAt: race.raceStartAt,
+    raceEndAt: race.raceEndAt,
+    expiresAt: race.expiryAt,
+    status: now >= race.activationAt ? 'active' : 'scheduled',
+    activatedAt: now >= race.activationAt ? now : null,
+  });
+
+  if (racePass.status === 'active') {
+    await grantRacePassRole(client, racePass);
+    try {
+      await user.send('**🏁 Your Race Pass is active!**\n\n**Race:** ' + race.name + '\n**Valid until:** <t:' + Math.floor(race.expiryAt.getTime() / 1000) + ':F>\n\nEnjoy the race weekend with Ace\'s Apex! 🏎️');
+    } catch (error) { console.error('Race Pass activation DM failed:', error); }
+  } else {
+    try {
+      await user.send('**🏁 Race Pass confirmed!**\n\n**Race:** ' + race.name + '\n**Access starts:** <t:' + Math.floor(race.activationAt.getTime() / 1000) + ':F>\n**Valid until:** <t:' + Math.floor(race.expiryAt.getTime() / 1000) + ':F>\n\nYour Race Pass will activate automatically when the race weekend begins.');
+    } catch (error) { console.error('Race Pass confirmation DM failed:', error); }
+  }
+  return racePass;
+}
+
+export async function processRacePasses(client) {
+  const now = new Date();
+  const scheduled = await RacePass.find({ status: 'scheduled', activationAt: { $lte: now }, expiresAt: { $gt: now } }).limit(200);
+  for (const racePass of scheduled) {
+    const claimed = await RacePass.findOneAndUpdate({ _id: racePass._id, status: 'scheduled' }, { $set: { status: 'active', activatedAt: now } }, { new: true });
+    if (!claimed) continue;
+    try {
+      await grantRacePassRole(client, claimed);
+      const user = await client.users.fetch(claimed.userId);
+      await user.send('**🏁 Your Race Pass is now active!**\n\n**Race:** ' + claimed.raceName + '\n**Valid until:** <t:' + Math.floor(claimed.expiresAt.getTime() / 1000) + ':F>\n\nEnjoy the race weekend with Ace\'s Apex! 🏎️');
+    } catch (error) {
+      await RacePass.updateOne({ _id: claimed._id, status: 'active' }, { $set: { status: 'scheduled', activatedAt: null } });
+      console.error('Failed to activate Race Pass:', error);
+    }
+  }
+
+  const expiring = await RacePass.find({ status: 'active', expiresAt: { $lte: now } }).limit(200);
+  for (const racePass of expiring) {
+    const claimed = await RacePass.findOneAndUpdate({ _id: racePass._id, status: 'active' }, { $set: { status: 'expired', expiredAt: now } }, { new: true });
+    if (!claimed) continue;
+    await removeRacePassRoleIfUnused(client, claimed);
+    try {
+      const user = await client.users.fetch(claimed.userId);
+      await user.send('**🏁 Race Pass expired**\n\nYour **' + claimed.raceName + '** Race Pass has expired. Thank you for joining us! ❤️');
+    } catch (error) { console.error('Race Pass expiry DM failed:', error); }
+  }
+}
