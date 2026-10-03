@@ -1,7 +1,10 @@
+import { randomUUID } from 'crypto';
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { grantMembership } from '../services/membershipService.js';
+import { grantRacePass } from '../services/racePassService.js';
+import { RACE_PASSES_2026 } from '../config/racePasses2026.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -13,6 +16,9 @@ export default {
       { name: 'Monthly', value: 'monthly' },
       { name: 'Yearly', value: 'yearly' },
     ))
+    .addStringOption(option => option.setName('race').setDescription('Race for the Race Pass (required when type is Race Pass)').setRequired(false).addChoices(
+      ...RACE_PASSES_2026.map(race => ({ name: race.name, value: race.key }))
+    ))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
@@ -22,17 +28,24 @@ export default {
 
     const user = interaction.options.getUser('user');
     const type = interaction.options.getString('type');
+    const raceKey = interaction.options.getString('race');
     if (!user) return interaction.reply({ content: '❌ User not found.', ephemeral: true });
 
     try {
-      const result = await grantMembership({
-        client,
-        guild: interaction.guild,
-        user,
-        type,
-        grantedBy: interaction.user,
-        source: '/grantmembership',
-      });
+      let result;
+      if (type === 'race') {
+        if (!raceKey) return interaction.reply({ content: '❌ Please select the race when granting a Race Pass.', ephemeral: true });
+        result = await grantRacePass({
+          client,
+          guild: interaction.guild,
+          user,
+          raceKey,
+          grantedBy: interaction.user,
+          paymentRequest: { requestId: 'admin-' + randomUUID(), country: 'india', amount: 0, currency: 'INR' },
+        });
+      } else {
+        result = await grantMembership({ client, guild: interaction.guild, user, type, grantedBy: interaction.user, source: '/grantmembership' });
+      }
 
       await interaction.reply({
         content: '✅ Membership granted successfully!\n\n' +
