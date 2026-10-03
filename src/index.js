@@ -31,12 +31,14 @@ import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
+import purchasemembershipCommand from './commands/purchasemembership.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
 
 // Import events
 import readyEvent from './events/ready.js';
 import interactionCreateEvent from './events/interactionCreate.js';
 import userUpdateEvent from './events/userUpdate.js';
+import { handlePurchaseInteraction, handlePurchaseModal } from './services/purchaseMembershipService.js';
 
 const client = new Client({
   intents: [
