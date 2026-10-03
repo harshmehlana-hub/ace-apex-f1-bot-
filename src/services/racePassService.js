@@ -23,11 +23,11 @@ async function removeRacePassRoleIfUnused(client, racePass) {
   }
 }
 
-export async function createRacePass({ client, guild, user, paymentRequest, raceKey }) {
+export async function createRacePass({ client, guild, user, paymentRequest, raceKey, ignoreWindow = false }) {
   const race = getRacePass(raceKey);
   if (!race) throw new Error('The selected Race Pass race is no longer available.');
   const now = new Date();
-  if (now < race.purchaseStartAt || now > race.purchaseEndAt) throw new Error('The purchase window for this Race Pass has closed.');
+  if (!ignoreWindow && (now < race.purchaseStartAt || now > race.purchaseEndAt)) throw new Error('The purchase window for this Race Pass has closed.');
   const existing = await RacePass.findOne({ userId: user.id, raceKey });
   if (existing && existing.status !== 'cancelled') throw new Error('You already have a Race Pass for this race.');
 
@@ -64,6 +64,10 @@ export async function createRacePass({ client, guild, user, paymentRequest, race
     } catch (error) { console.error('Race Pass confirmation DM failed:', error); }
   }
   return { racePass, expiry: racePass.expiresAt, membershipName: 'Race Pass' };
+}
+
+export async function grantRacePass({ client, guild, user, raceKey, paymentRequest }) {
+  return createRacePass({ client, guild, user, paymentRequest, raceKey, ignoreWindow: true });
 }
 
 export async function processRacePasses(client) {
