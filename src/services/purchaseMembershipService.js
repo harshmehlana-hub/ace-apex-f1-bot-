@@ -157,7 +157,7 @@ export async function handlePurchaseModal(interaction, client) {
       .setTitle('💳 Membership Payment Verification Needed')
       .setTimestamp()
       .addFields(
-        { name: '👤 User', value: interaction.user.tag + '\\n`' + interaction.user.id + '`', inline: true },
+        { name: '👤 User', value: interaction.user.tag + '\n`' + interaction.user.id + '`', inline: true },
         { name: '🎟️ Membership', value: MEMBERSHIP_DETAILS[type].name, inline: true },
         { name: '💰 Amount', value: money(payment), inline: true },
         { name: '🌍 Payment region', value: country === 'india' ? 'India / UPI' : 'International / PayPal', inline: true },
@@ -176,7 +176,7 @@ export async function handlePurchaseModal(interaction, client) {
     return interaction.editReply('❌ I could not notify the admin verification channel. Please try again.');
   }
 
-  await interaction.editReply('✅ Payment details submitted for manual verification.\\n\\nAn admin will check the payment and grant your membership if it is confirmed.');
+  await interaction.editReply('✅ Payment details submitted for manual verification.\n\nAn admin will check the payment and grant your membership if it is confirmed.');
   return true;
 }
 
@@ -209,7 +209,7 @@ async function verifyPayment(interaction, client, requestId) {
     await request.save();
     await interaction.message.edit({
       embeds: [new EmbedBuilder().setColor(0x2ecc71).setTitle('✅ Membership Payment Verified & Granted').setTimestamp().addFields(
-        { name: '👤 User', value: user.tag + '\\n`' + user.id + '`', inline: true },
+        { name: '👤 User', value: user.tag + '\n`' + user.id + '`', inline: true },
         { name: '🎟️ Membership', value: result.membershipName, inline: true },
         { name: '💰 Amount', value: request.currency + ' ' + request.amount, inline: true },
         { name: '🧾 Payer name', value: request.payerName, inline: true },
@@ -248,7 +248,7 @@ async function rejectPayment(interaction, client, requestId) {
 
   await interaction.message.edit({
     embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle('❌ Membership Payment Rejected').setTimestamp().addFields(
-      { name: '👤 User', value: '<@' + request.userId + '>\\n`' + request.userId + '`', inline: true },
+      { name: '👤 User', value: '<@' + request.userId + '>\n`' + request.userId + '`', inline: true },
       { name: '🎟️ Membership', value: MEMBERSHIP_DETAILS[request.type].name, inline: true },
       { name: '💰 Amount', value: request.currency + ' ' + request.amount, inline: true },
       { name: '🧾 Payer name', value: request.payerName, inline: true },
