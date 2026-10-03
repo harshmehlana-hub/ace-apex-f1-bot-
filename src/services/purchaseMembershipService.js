@@ -150,7 +150,7 @@ export async function handlePurchaseModal(interaction, client) {
   });
 
   try {
-    const channel = await client.channels.fetch(config.channels.logs);
+    const channel = await client.channels.fetch(config.channels.dmLogs);
     if (!channel) throw new Error('Log channel not found');
     const embed = new EmbedBuilder()
       .setColor(0xf1c40f)
