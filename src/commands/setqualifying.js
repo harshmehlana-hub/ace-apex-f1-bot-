@@ -1,7 +1,8 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { config } from '../config.js';
-import { isAdmin } from '../utils/validators.js';
+import { isAdmin, parseISTDateTime } from '../utils/validators.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -35,29 +36,23 @@ export default {
       });
     }
 
-    const name = interaction.options.getString('name');
+    const name = interaction.options.getString('name').trim();
     const dateStr = interaction.options.getString('date');
     const timeStr = interaction.options.getString('time');
+    const sessionStartTime = parseISTDateTime(dateStr, timeStr);
 
-    const [day, month, year] = dateStr.split('-');
-
-    const sessionStartTime = new Date(
-      `${year}-${month}-${day}T${timeStr}:00+05:30`
-    );
-
-    if (isNaN(sessionStartTime.getTime())) {
+    if (!sessionStartTime) {
       return interaction.reply({
-        content:
-          '❌ Invalid date or time format.\nUse DD-MM-YYYY and HH:MM.',
+        content: '❌ Invalid date/time. Use DD-MM-YYYY and HH:MM in IST, and enter a real calendar date.',
         ephemeral: true,
       });
     }
 
-    const existingSession = await Qualifying.findOne({ name });
-
+    const season = await getCurrentSeason();
+    const existingSession = await Qualifying.findOne({ season, name });
     if (existingSession) {
       return interaction.reply({
-        content: `❌ A qualifying session named "${name}" already exists.`,
+        content: `❌ A qualifying session named "${name}" already exists in season ${season}.`,
         ephemeral: true,
       });
     }
@@ -81,7 +76,7 @@ export default {
 
     const qualifying = new Qualifying({
       name,
-      season: config.season,
+      season,
       sessionStartTime,
       predictionOpenTime,
       predictionCloseTime,

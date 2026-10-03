@@ -42,7 +42,7 @@ const membershipSchema = new mongoose.Schema({
     type: Boolean,
     default: false,
   },
-});
+}, { timestamps: true });
 
 export const Membership = mongoose.model(
   'Membership',

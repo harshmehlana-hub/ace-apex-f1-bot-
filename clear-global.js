@@ -5,17 +5,17 @@ dotenv.config();
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
-async function clearGlobalCommands() {
+async function removeAnnouncementCommand() {
   try {
-    await rest.put(
-      Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
-      { body: [] }
-    );
-
-    console.log('✅ Global commands deleted');
+    const applicationId = process.env.DISCORD_CLIENT_ID;
+    const commands = await rest.get(Routes.applicationCommands(applicationId));
+    const remaining = commands.filter(command => command.name !== 'announcement');
+    await rest.put(Routes.applicationCommands(applicationId), { body: remaining });
+    console.log(`✅ Global commands updated. Removed /announcement; kept ${remaining.length} other command(s).`);
   } catch (error) {
-    console.error(error);
+    console.error('Failed to remove global /announcement:', error);
+    process.exitCode = 1;
   }
 }
 
-clearGlobalCommands();
+removeAnnouncementCommand();

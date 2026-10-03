@@ -15,7 +15,7 @@ export function createPredictionEmbed(race, prediction, user) {
     .setTimestamp();
 }
 
-export function createLeaderboardEmbed(leaderboard, page = 1, perPage = 10) {
+export function createLeaderboardEmbed(leaderboard, page = 1, perPage = 10, season = '') {
   const start = (page - 1) * perPage;
   const pageData = leaderboard.slice(start, start + perPage);
   
@@ -27,16 +27,16 @@ export function createLeaderboardEmbed(leaderboard, page = 1, perPage = 10) {
 
   return new EmbedBuilder()
     .setColor(0xE10600)
-    .setTitle('🏆 Season Leaderboard')
+    .setTitle(`🏆 ${season} Season Leaderboard`)
     .setDescription(description || 'No predictions yet!')
     .setFooter({ text: `Page ${page} of ${Math.ceil(leaderboard.length / perPage)}` })
     .setTimestamp();
 }
 
-export function createRankEmbed(user, rank, totalUsers) {
+export function createRankEmbed(user, rank, totalUsers, season = '') {
   return new EmbedBuilder()
     .setColor(0xE10600)
-    .setTitle('📊 User Statistics')
+    .setTitle(`📊 User Statistics${season ? ` - ${season}` : ''}`)
     .addFields(
       { name: 'User', value: user.username, inline: true },
       { name: 'Rank', value: `${rank} / ${totalUsers}`, inline: true },

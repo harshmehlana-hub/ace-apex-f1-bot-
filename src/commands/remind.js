@@ -5,7 +5,7 @@ import {
 
 import { Reminder } from '../database/models/Reminder.js';
 import { config } from '../config.js';
-import { isAdmin } from '../utils/validators.js';
+import { isAdmin, parseISTDateTime } from '../utils/validators.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -42,35 +42,14 @@ export default {
       });
     }
 
-    const message =
-      interaction.options.getString('message');
+    const message = interaction.options.getString('message');
+    const dateStr = interaction.options.getString('date');
+    const timeStr = interaction.options.getString('time');
+    const remindAt = parseISTDateTime(dateStr, timeStr);
 
-    const dateStr =
-      interaction.options.getString('date');
-
-    const timeStr =
-      interaction.options.getString('time');
-
-    const [day, month, year] =
-      dateStr.split('-').map(Number);
-
-    const [hours, minutes] =
-      timeStr.split(':').map(Number);
-
-    const remindAt = new Date(
-      Date.UTC(
-        year,
-        month - 1,
-        day,
-        hours - 5,
-        minutes - 30
-      )
-    );
-
-    if (isNaN(remindAt.getTime())) {
+    if (!remindAt || remindAt <= new Date()) {
       return interaction.reply({
-        content:
-          '❌ Invalid date or time format.',
+        content: '❌ Invalid date/time or the reminder time is in the past.',
         ephemeral: true,
       });
     }

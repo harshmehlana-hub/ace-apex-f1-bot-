@@ -10,6 +10,7 @@ import { User } from '../database/models/User.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { config } from '../config.js';
 import { getOrCreateSeasonStanding } from '../services/seasonStandingService.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -17,9 +18,11 @@ export default {
     .setDescription('Predict the Pole Position winner'),
 
   async execute(interaction, client) {
+    const activeSeason = await getCurrentSeason();
     const openSessions = await Qualifying.find({
+      season: activeSeason,
       status: 'open',
-    });
+    }).sort({ sessionStartTime: 1 }).limit(25);
 
     if (openSessions.length === 0) {
       return interaction.reply({
@@ -57,9 +60,10 @@ export default {
 
       const qualifyingId = sessionInteraction.values[0];
 
-      const selectedSession = openSessions.find(
-        q => q._id.toString() === qualifyingId
-      );
+      const selectedSession = await Qualifying.findOne({ _id: qualifyingId, season: activeSeason, status: 'open' });
+      if (!selectedSession || new Date() < selectedSession.predictionOpenTime || new Date() >= selectedSession.predictionCloseTime) {
+        return sessionInteraction.update({ content: '❌ Predictions for this qualifying session are no longer open.', components: [] });
+      }
 
       const existingPrediction =
         await QualifyingPrediction.findOne({
@@ -137,9 +141,6 @@ await standing.save();
           $setOnInsert: {
             discordId: interaction.user.id,
             username: interaction.user.username,
-            totalPoints: 0,
-            perfectPredictions: 0,
-            pointsReachedAt: new Date(),
           },
         },
         { upsert: true }

@@ -1,15 +1,15 @@
+import mongoose from 'mongoose';
 import { config } from '../config.js';
 import { Prediction } from '../database/models/Prediction.js';
-import { User } from '../database/models/User.js';
-import { getOrCreateSeasonStanding } from './seasonStandingService.js';
+import { QualifyingPrediction } from '../database/models/QualifyingPrediction.js';
+import { PointTransaction } from '../database/models/PointTransaction.js';
+import { rebuildAllSeasonStandings } from './seasonStandingService.js';
 
 export function calculateScore(prediction, result) {
   let correctPositions = 0;
-  
   if (prediction.p1Driver === result.p1Driver) correctPositions++;
   if (prediction.p2Driver === result.p2Driver) correctPositions++;
   if (prediction.p3Driver === result.p3Driver) correctPositions++;
-  
   return {
     correctPositions,
     points: config.scoring[correctPositions],
@@ -17,130 +17,110 @@ export function calculateScore(prediction, result) {
   };
 }
 
-export async function processRaceResults(raceId, result) {
-  const predictions = await Prediction.find({ raceId });
-  const scores = [];
-  
+export function calculateQualifyingScore(prediction, result) {
+  return prediction.predictedDriver === result.poleDriver
+    ? config.qualifyingScoring.correct
+    : config.qualifyingScoring.incorrect;
+}
+
+async function upsertTransaction({ userId, season, sourceType, sourceId, amount, reason, createdBy }, session) {
+  return PointTransaction.findOneAndUpdate(
+    { userId, season, sourceType, sourceId },
+    { $set: { amount, reason, createdBy } },
+    { upsert: true, new: true, setDefaultsOnInsert: true, session }
+  );
+}
+
+export async function processRaceResults(race, result, options = {}) {
+  const session = options.session || null;
+  const predictions = await Prediction.find({ raceId: race._id }).session(session);
+
   for (const prediction of predictions) {
-    const { points, isPerfect } = calculateScore(prediction, result);
-    
-    // Update prediction with points
+    const { points } = calculateScore(prediction, result);
     prediction.pointsAwarded = points;
-    await prediction.save();
-    
-    // Update user stats
-    let user = await User.findOne({ discordId: prediction.userId });
-    if (user) {
-      user.totalPoints += points;
-      user.pointsReachedAt = new Date();
-      if (isPerfect) {
-        user.perfectPredictions += 1;
-      }
-      await user.save();
-    }
-
-const standing = await getOrCreateSeasonStanding(
-  prediction.userId,
-  prediction.season
-);
-
-standing.racePoints += points;
-standing.totalPoints += points;
-
-if (prediction.p1Driver === result.p1Driver) {
-  standing.correctP1Predictions += 1;
-}
-
-if (prediction.p2Driver === result.p2Driver) {
-  standing.correctP2Predictions += 1;
-}
-
-if (prediction.p3Driver === result.p3Driver) {
-  standing.correctP3Predictions += 1;
-}
-
-if (isPerfect) {
-  standing.perfectPodiums += 1;
-}
-
-await standing.save();
-    
-    scores.push({
+    await prediction.save({ session });
+    await upsertTransaction({
       userId: prediction.userId,
-      pointsAwarded: points,
-      submittedAt: prediction.submittedAt,
-    });
+      season: prediction.season,
+      sourceType: 'race_result',
+      sourceId: String(race._id),
+      amount: points,
+      reason: `${race.name} race result`,
+    }, session);
   }
-  
-  // Sort by points (desc) then by submission time (asc) for tiebreaker
-  scores.sort((a, b) => {
-    if (b.pointsAwarded !== a.pointsAwarded) {
-      return b.pointsAwarded - a.pointsAwarded;
-    }
-    return a.submittedAt - b.submittedAt;
-  });
-  
-  return scores;
+
+  await rebuildAllSeasonStandings(race.season, { session });
+  return predictions.map(prediction => ({
+    userId: prediction.userId,
+    pointsAwarded: prediction.pointsAwarded,
+    submittedAt: prediction.submittedAt,
+  })).sort((a, b) => b.pointsAwarded - a.pointsAwarded || a.submittedAt - b.submittedAt || a.userId.localeCompare(b.userId));
 }
 
-export async function recalculateRaceScores(raceId, oldResult, newResult) {
-  const predictions = await Prediction.find({ raceId });
-  
+export async function recalculateRaceScores(race, oldResult, newResult, options = {}) {
+  const session = options.session || null;
+  const predictions = await Prediction.find({ raceId: race._id }).session(session);
+
   for (const prediction of predictions) {
-    const oldScore = calculateScore(prediction, oldResult);
-    const newScore = calculateScore(prediction, newResult);
-    
-    const pointDiff = newScore.points - oldScore.points;
-    const perfectDiff = (newScore.isPerfect ? 1 : 0) - (oldScore.isPerfect ? 1 : 0);
-    
-    // Update prediction
-    prediction.pointsAwarded = newScore.points;
-    await prediction.save();
-    
-    // Update user
-    const user = await User.findOne({ discordId: prediction.userId });
-    if (user) {
-      user.totalPoints += pointDiff;
-      user.perfectPredictions += perfectDiff;
-      user.pointsReachedAt = new Date();
-      await user.save();
-    }
+    const { points } = calculateScore(prediction, newResult);
+    prediction.pointsAwarded = points;
+    await prediction.save({ session });
+    await upsertTransaction({
+      userId: prediction.userId,
+      season: prediction.season,
+      sourceType: 'race_result',
+      sourceId: String(race._id),
+      amount: points,
+      reason: `${race.name} corrected race result`,
+    }, session);
+  }
 
-const standing = await getOrCreateSeasonStanding(
-  prediction.userId,
-  prediction.season
-);
-
-standing.racePoints += pointDiff;
-standing.totalPoints += pointDiff;
-standing.perfectPodiums += perfectDiff;
-
-// Remove old accuracy counts
-if (prediction.p1Driver === oldResult.p1Driver) {
-  standing.correctP1Predictions -= 1;
+  await rebuildAllSeasonStandings(race.season, { session });
+  return predictions.map(prediction => ({
+    userId: prediction.userId,
+    pointsAwarded: prediction.pointsAwarded,
+    submittedAt: prediction.submittedAt,
+  })).sort((a, b) => b.pointsAwarded - a.pointsAwarded || a.submittedAt - b.submittedAt || a.userId.localeCompare(b.userId));
 }
 
-if (prediction.p2Driver === oldResult.p2Driver) {
-  standing.correctP2Predictions -= 1;
+export async function processQualifyingResults(qualifying, result, options = {}) {
+  const session = options.session || null;
+  const predictions = await QualifyingPrediction.find({ qualifyingId: qualifying._id }).session(session);
+
+  for (const prediction of predictions) {
+    const points = calculateQualifyingScore(prediction, result);
+    prediction.pointsAwarded = points;
+    await prediction.save({ session });
+    await upsertTransaction({
+      userId: prediction.userId,
+      season: prediction.season,
+      sourceType: 'qualifying_result',
+      sourceId: String(qualifying._id),
+      amount: points,
+      reason: `${qualifying.name} qualifying result`,
+    }, session);
+  }
+
+  await rebuildAllSeasonStandings(qualifying.season, { session });
+  return predictions.map(prediction => ({
+    userId: prediction.userId,
+    pointsAwarded: prediction.pointsAwarded,
+  }));
 }
 
-if (prediction.p3Driver === oldResult.p3Driver) {
-  standing.correctP3Predictions -= 1;
+export async function recalculateQualifyingScores(qualifying, result, options = {}) {
+  return processQualifyingResults(qualifying, result, options);
 }
 
-// Apply new accuracy counts
-if (prediction.p1Driver === newResult.p1Driver) {
-  standing.correctP1Predictions += 1;
-}
-
-if (prediction.p2Driver === newResult.p2Driver) {
-  standing.correctP2Predictions += 1;
-}
-
-if (prediction.p3Driver === newResult.p3Driver) {
-  standing.correctP3Predictions += 1;
-}
-
-await standing.save();
- }
+export async function runInTransaction(work) {
+  const session = await mongoose.startSession();
+  try {
+    let value;
+    await session.withTransaction(async () => {
+      value = await work(session);
+    });
+    return value;
+  } finally {
+    await session.endSession();
+  }
 }

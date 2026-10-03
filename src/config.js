@@ -13,7 +13,7 @@ export const config = {
   statistics: process.env.STATISTICS_CHANNEL_ID,
   dmLogs: process.env.DM_LOGS_CHANNEL_ID,
 },
-season: process.env.CURRENT_SEASON,
+season: process.env.CURRENT_SEASON || String(new Date().getUTCFullYear()),
   roles: {
   predictor: process.env.PREDICTOR_ROLE_ID,
   admin: process.env.ADMIN_ROLE_ID,

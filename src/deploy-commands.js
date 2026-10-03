@@ -18,12 +18,12 @@ import qualifyingresultCommand from './commands/qualifyingresult.js';
 import deletequalifyingCommand from './commands/deletequalifying.js';
 import predictionstatsCommand from './commands/predictionstats.js';
 import remindCommand from './commands/remind.js';
-import announcementCommand from './commands/announcement.js';
 import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
 import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js'
 import dmCommand from './commands/dm.js';
+import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -42,7 +42,7 @@ qualifyingresultCommand.data.toJSON(),
 deletequalifyingCommand.data.toJSON(),
 predictionstatsCommand.data.toJSON(),
 remindCommand.data.toJSON(),
-announcementCommand.data.toJSON(),
+recalculatequalifyingCommand.data.toJSON(),
 grantmembershipCommand.data.toJSON(),
 membershipinfoCommand.data.toJSON(),
 deletemembershipCommand.data.toJSON(),

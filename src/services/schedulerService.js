@@ -1,569 +1,209 @@
 import cron from 'node-cron';
 import { Routes } from 'discord.js';
-
 import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
-import { Announcement } from '../database/models/Announcement.js';
-import { Prediction } from '../database/models/Prediction.js';
 import { Membership } from '../database/models/Membership.js';
-
 import { config } from '../config.js';
+import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createPredictionStatisticsEmbed } from '../utils/embeds.js';
+import { Prediction } from '../database/models/Prediction.js';
+import { getCurrentSeason } from './seasonService.js';
 
-import {
-  createRaceAnnouncementEmbed,
-  createQualifyingAnnouncementEmbed,
-  createPredictionStatisticsEmbed,
-} from '../utils/embeds.js';
-
-import { logDM } from '../utils/dmLogger.js';
+let schedulerRunning = false;
 
 export function setupScheduler(client) {
-  // Run every minute
-  cron.schedule('* * * * *', async () => {
-    await updateRaceStatuses(client);
-    await updateQualifyingStatuses(client);
-    await processReminders(client);
-    await processAnnouncements(client);
-    await processMemberships(client);
-  });
+  const run = async () => {
+    if (schedulerRunning) return;
+    schedulerRunning = true;
+    try {
+      await Promise.allSettled([
+        updateRaceStatuses(client),
+        updateQualifyingStatuses(client),
+        processReminders(client),
+        processMemberships(client),
+      ]);
+    } finally {
+      schedulerRunning = false;
+    }
+  };
 
+  run().catch(error => console.error('Initial scheduler run failed:', error));
+  cron.schedule('* * * * *', () => run().catch(error => console.error('Scheduler cycle failed:', error)));
   console.log('Scheduler initialized');
+}
+
+function getTimeStatus(openTime, closeTime, now) {
+  if (now < openTime) return 'upcoming';
+  if (now < closeTime) return 'open';
+  return 'closed';
 }
 
 async function updateRaceStatuses(client) {
   const now = new Date();
+  const season = await getCurrentSeason();
+  const races = await Race.find({ season, status: { $in: ['upcoming', 'open', 'closed'] } });
 
-  // -----------------------------
-  // OPEN RACES
-  // -----------------------------
-  const racesToOpen = await Race.find({
-    status: 'upcoming',
-    predictionOpenTime: { $lte: now },
-  });
+  for (const race of races) {
+    const desired = getTimeStatus(race.predictionOpenTime, race.predictionCloseTime, now);
 
-  for (const race of racesToOpen) {
-    race.status = 'open';
-    await race.save();
-
-    if (!race.announcementSent) {
-      await sendPredictionOpenAnnouncement(client, race);
-
-      race.announcementSent = true;
+    if (desired === 'open' && race.status !== 'open') {
+      race.status = 'open';
       await race.save();
+      await claimAndSendRaceAnnouncement(client, race);
+    } else if (desired === 'closed' && race.status === 'open') {
+      race.status = 'closed';
+      await race.save();
+      await claimAndSendStatistics(client, race);
+    } else if (desired === 'closed' && race.status === 'upcoming') {
+      race.status = 'closed';
+      await race.save();
+      await claimAndSendStatistics(client, race);
     }
-  }
-
-  // -----------------------------
-  // CLOSE RACES
-  // -----------------------------
-  const racesToClose = await Race.find({
-    status: 'open',
-    predictionCloseTime: { $lte: now },
-  });
-
-  for (const race of racesToClose) {
-    await sendPredictionStatistics(client, race);
-
-    race.status = 'closed';
-    await race.save();
   }
 }
 
 async function updateQualifyingStatuses(client) {
   const now = new Date();
+  const season = await getCurrentSeason();
+  const sessions = await Qualifying.find({ season, status: { $in: ['upcoming', 'open', 'closed'] } });
 
-  // -----------------------------
-  // OPEN QUALIFYING
-  // -----------------------------
-  const sessionsToOpen = await Qualifying.find({
-    status: 'upcoming',
-    predictionOpenTime: { $lte: now },
-  });
-
-  for (const qualifying of sessionsToOpen) {
-    qualifying.status = 'open';
-    await qualifying.save();
-
-    if (!qualifying.announcementSent) {
-      await sendQualifyingOpenAnnouncement(
-        client,
-        qualifying
-      );
-
-      qualifying.announcementSent = true;
+  for (const qualifying of sessions) {
+    const desired = getTimeStatus(qualifying.predictionOpenTime, qualifying.predictionCloseTime, now);
+    if (desired === 'open' && qualifying.status !== 'open') {
+      qualifying.status = 'open';
+      await qualifying.save();
+      await claimAndSendQualifyingAnnouncement(client, qualifying);
+    } else if (desired === 'closed' && qualifying.status !== 'closed') {
+      qualifying.status = 'closed';
       await qualifying.save();
     }
   }
+}
 
-  // -----------------------------
-  // CLOSE QUALIFYING
-  // -----------------------------
-  const sessionsToClose = await Qualifying.find({
-    status: 'open',
-    predictionCloseTime: { $lte: now },
-  });
-
-  for (const qualifying of sessionsToClose) {
-    qualifying.status = 'closed';
-    await qualifying.save();
+async function claimAndSendRaceAnnouncement(client, race) {
+  if (race.announcementSent) return;
+  const claimed = await Race.findOneAndUpdate(
+    { _id: race._id, announcementSent: false },
+    { $set: { announcementSent: true } },
+    { new: true }
+  );
+  if (!claimed) return;
+  try {
+    const channel = await client.channels.fetch(config.channels.announcements);
+    if (!channel) throw new Error('Announcement channel not found');
+    await channel.send({ content: '@everyone 🏁 Race Predictions are now LIVE!', embeds: [createRaceAnnouncementEmbed(race)] });
+  } catch (error) {
+    await Race.updateOne({ _id: race._id }, { $set: { announcementSent: false } });
+    console.error('Failed to send prediction announcement:', error);
   }
 }
 
-async function sendPredictionOpenAnnouncement(
-  client,
-  race
-) {
+async function claimAndSendQualifyingAnnouncement(client, qualifying) {
+  if (qualifying.announcementSent) return;
+  const claimed = await Qualifying.findOneAndUpdate(
+    { _id: qualifying._id, announcementSent: false },
+    { $set: { announcementSent: true } },
+    { new: true }
+  );
+  if (!claimed) return;
   try {
-    const channel = await client.channels.fetch(
-      config.channels.announcements
-    );
-
-    if (!channel) return;
-
-    const embed = createRaceAnnouncementEmbed(race);
-
-    await channel.send({
-      content: '@everyone 🏁 Race Predictions are now LIVE!',
-      embeds: [embed],
-    });
+    const channel = await client.channels.fetch(config.channels.announcements);
+    if (!channel) throw new Error('Announcement channel not found');
+    await channel.send({ content: '@everyone 🏁 Qualifying Predictions are now LIVE!', embeds: [createQualifyingAnnouncementEmbed(qualifying)] });
   } catch (error) {
-    console.error(
-      'Failed to send prediction announcement:',
-      error
-    );
+    await Qualifying.updateOne({ _id: qualifying._id }, { $set: { announcementSent: false } });
+    console.error('Failed to send qualifying announcement:', error);
   }
 }
 
-async function sendQualifyingOpenAnnouncement(
-  client,
-  qualifying
-) {
+async function claimAndSendStatistics(client, race) {
+  const claimed = await Race.findOneAndUpdate(
+    { _id: race._id, statisticsSent: false },
+    { $set: { statisticsSent: true } },
+    { new: true }
+  );
+  if (!claimed) return;
+
   try {
-    const channel = await client.channels.fetch(
-      config.channels.announcements
-    );
-
-    if (!channel) return;
-
-    const embed =
-      createQualifyingAnnouncementEmbed(
-        qualifying
-      );
-
-    await channel.send({
-      content:
-        '@everyone 🏁 Qualifying Predictions are now LIVE!',
-      embeds: [embed],
-    });
+    const predictions = await Prediction.find({ raceId: race._id });
+    if (!predictions.length) return;
+    const total = predictions.length;
+    const count = key => predictions.reduce((map, p) => { map[p[key]] = (map[p[key]] || 0) + 1; return map; }, {});
+    const top = obj => Object.entries(obj).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+    const p1 = top(count('p1Driver')); const p2 = top(count('p2Driver')); const p3 = top(count('p3Driver'));
+    const channel = await client.channels.fetch(config.channels.statistics);
+    if (!channel) throw new Error('Statistics channel not found');
+    await channel.send({ embeds: [createPredictionStatisticsEmbed(race, total, p1[0], p1[1], ((p1[1] / total) * 100).toFixed(1), p2[0], p2[1], ((p2[1] / total) * 100).toFixed(1), p3[0], p3[1], ((p3[1] / total) * 100).toFixed(1))] });
   } catch (error) {
-    console.error(
-      'Failed to send qualifying announcement:',
-      error
-    );
-  }
-}
-
-async function sendPredictionStatistics(
-  client,
-  race
-) {
-  try {
-    const predictions = await Prediction.find({
-      raceId: race._id,
-    });
-
-    if (predictions.length === 0) return;
-
-    const totalPredictions = predictions.length;
-
-    const p1Counts = {};
-    const p2Counts = {};
-    const p3Counts = {};
-
-    for (const prediction of predictions) {
-      p1Counts[prediction.p1Driver] =
-        (p1Counts[prediction.p1Driver] || 0) + 1;
-
-      p2Counts[prediction.p2Driver] =
-        (p2Counts[prediction.p2Driver] || 0) + 1;
-
-      p3Counts[prediction.p3Driver] =
-        (p3Counts[prediction.p3Driver] || 0) + 1;
-    }
-
-    const topP1 = Object.entries(p1Counts)
-      .sort((a, b) => b[1] - a[1])[0];
-
-    const topP2 = Object.entries(p2Counts)
-      .sort((a, b) => b[1] - a[1])[0];
-
-    const topP3 = Object.entries(p3Counts)
-      .sort((a, b) => b[1] - a[1])[0];
-
-    const channel = await client.channels.fetch(
-      config.channels.statistics
-    );
-
-    if (!channel) return;
-
-    const embed =
-      createPredictionStatisticsEmbed(
-        race,
-        totalPredictions,
-
-        topP1[0],
-        topP1[1],
-        ((topP1[1] / totalPredictions) * 100).toFixed(1),
-
-        topP2[0],
-        topP2[1],
-        ((topP2[1] / totalPredictions) * 100).toFixed(1),
-
-        topP3[0],
-        topP3[1],
-        ((topP3[1] / totalPredictions) * 100).toFixed(1)
-      );
-
-    await channel.send({
-      embeds: [embed],
-    });
-  } catch (error) {
-    console.error(
-      'Failed to send prediction statistics:',
-      error
-    );
+    await Race.updateOne({ _id: race._id }, { $set: { statisticsSent: false } });
+    console.error('Failed to send prediction statistics:', error);
   }
 }
 
 async function processReminders(client) {
   const now = new Date();
-
-  const reminders = await Reminder.find({
-    sent: false,
-    remindAt: { $lte: now },
-  });
-
+  const reminders = await Reminder.find({ sent: false, remindAt: { $lte: now } }).limit(100);
   for (const reminder of reminders) {
+    const claimed = await Reminder.findOneAndUpdate({ _id: reminder._id, sent: false }, { $set: { sent: true } }, { new: true });
+    if (!claimed) continue;
     try {
-      const channel = await client.channels.fetch(
-        reminder.channelId
-      );
-
-      if (channel) {
-        await channel.send({
-          content:
-            `<@${reminder.userId}>\n\n` +
-            `⚠️ **Reminder**\n\n` +
-            reminder.message,
-        });
-      }
-
-      reminder.sent = true;
-      await reminder.save();
+      const channel = await client.channels.fetch(reminder.channelId);
+      if (!channel) throw new Error('Reminder channel not found');
+      await channel.send({ content: `<@${reminder.userId}>\n\n⚠️ **Reminder**\n\n${reminder.message}` });
     } catch (error) {
-      console.error(
-        'Failed to send reminder:',
-        error
-      );
-    }
-  }
-}
-
-async function processAnnouncements(client) {
-  const now = new Date();
-
-  const announcements = await Announcement.find({
-    nextAnnouncementAt: { $lte: now },
-  });
-
-  for (const announcement of announcements) {
-    // -----------------------------
-    // PREDICTIONS CLOSED
-    // -----------------------------
-    if (now >= announcement.predictionCloseTime) {
-      try {
-        const channel = await client.channels.fetch(
-          announcement.channelId
-        );
-
-        if (channel) {
-          const eventType =
-            announcement.type === 'race'
-              ? 'Race'
-              : 'Qualifying';
-
-          const closingMessage =
-            announcement.type === 'race'
-              ? 'Best of luck to everyone on the grid! 🏎️'
-              : 'Best of luck to everyone on the grid! 🏁';
-
-          await channel.send({
-            content:
-              `@everyone 🔒 **${eventType} Predictions are now CLOSED!**\n\n` +
-              `Predictions for **${announcement.name}** are now closed.\n\n` +
-              `${closingMessage}\n\n` +
-              `Results will be published after the ${announcement.type}.`,
-          });
-        }
-      } catch (error) {
-        console.error(
-          'Failed to send closing announcement:',
-          error
-        );
-      }
-
-      await announcement.deleteOne();
-      continue;
-    }
-
-    // -----------------------------
-    // SEND ANNOUNCEMENT
-    // -----------------------------
-    try {
-      const channel = await client.channels.fetch(
-        announcement.channelId
-      );
-
-      if (!channel) continue;
-
-      const command =
-        announcement.type === 'race'
-          ? '/predict'
-          : '/predictqualifying';
-
-      const title =
-        announcement.type === 'race'
-          ? '🏎️ Race Predictions are OPEN!'
-          : '🏁 Qualifying Predictions are OPEN!';
-
-      await channel.send({
-        content:
-          `@everyone ${title}\n\n` +
-          `Predictions are now open for **${announcement.name}**.\n\n` +
-          `Use \`${command}\` to submit your prediction.\n\n` +
-          `⏰ Predictions close:\n` +
-          `• <t:${Math.floor(
-            announcement.predictionCloseTime.getTime() / 1000
-          )}:R>\n` +
-          `• <t:${Math.floor(
-            announcement.predictionCloseTime.getTime() / 1000
-          )}:F>`,
-      });
-
-      // Schedule next reminder
-      if (announcement.sendIndex === 0) {
-        announcement.nextAnnouncementAt =
-          new Date(
-            now.getTime() + 3 * 60 * 60 * 1000
-          );
-      } else {
-        announcement.nextAnnouncementAt =
-          new Date(
-            now.getTime() + 6 * 60 * 60 * 1000
-          );
-      }
-
-      announcement.sendIndex += 1;
-
-      // Finished all 5 announcements
-      if (announcement.sendIndex >= 5) {
-        await announcement.deleteOne();
-      } else {
-        await announcement.save();
-      }
-    } catch (error) {
-      console.error(
-        'Failed to send announcement:',
-        error
-      );
+      await Reminder.updateOne({ _id: reminder._id }, { $set: { sent: false } });
+      console.error('Failed to send reminder:', error);
     }
   }
 }
 
 async function processMemberships(client) {
   const now = new Date();
-
-  const memberships = await Membership.find({
-    type: { $in: ['monthly', 'yearly'] },
-  });
+  const memberships = await Membership.find({ expiresAt: { $lte: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000) } }).limit(200);
 
   for (const membership of memberships) {
     try {
-      const expiresIn =
-        membership.expiresAt.getTime() -
-        now.getTime();
+      const guild = await client.guilds.fetch(membership.guildId);
+      if (!guild) continue;
+      const member = await guild.members.fetch(membership.userId).catch(() => null);
 
-      const fiveDays =
-        5 * 24 * 60 * 60 * 1000;
+      const fiveDays = membership.expiresAt.getTime() - 5 * 24 * 60 * 60 * 1000;
+      const oneDay = membership.expiresAt.getTime() - 24 * 60 * 60 * 1000;
 
-      const oneDay =
-        24 * 60 * 60 * 1000;
-
-      // -----------------------------
-      // 5 DAY REMINDER
-      // -----------------------------
-      if (
-        expiresIn > oneDay &&
-        expiresIn <= fiveDays &&
-        !membership.fiveDayReminderSent
-      ) {
-        const user = await client.users
-          .fetch(membership.userId)
-          .catch(() => null);
-
-        if (user) {
-          await user.send(
-            `**Hey ${user.username}! 👋**\n\n` +
-            `Your **${
-              membership.type === 'monthly'
-                ? 'Monthly Membership'
-                : 'Yearly Membership'
-            }** will expire in **5 days**.\n\n` +
-            `**Expires:** <t:${Math.floor(
-              membership.expiresAt.getTime() / 1000
-            )}:F>\n\n` +
-            `If you'd like to renew your membership, please **DM Ace** before it expires to avoid losing your membership benefits.\n\n` +
-            `Thank you for supporting **Ace's Apex**! ❤️`
-          );
-
-          await logDM(
-            client,
-            '5-Day Reminder',
-            null,
-            user,
-            `Membership expires on <t:${Math.floor(
-              membership.expiresAt.getTime() / 1000
-            )}:F>`
-          );
-
-          membership.fiveDayReminderSent = true;
-          await membership.save();
-        }
+      if (now.getTime() >= fiveDays && now < membership.expiresAt && !membership.fiveDayReminderSent) {
+        const claimed = await Membership.findOneAndUpdate({ _id: membership._id, fiveDayReminderSent: false }, { $set: { fiveDayReminderSent: true } }, { new: true });
+        if (claimed && !(await sendMembershipDM(client, membership, '5 days remaining', `Your ${membership.type} membership expires in 5 days.`))) await Membership.updateOne({ _id: membership._id }, { $set: { fiveDayReminderSent: false } });
       }
 
-      // -----------------------------
-      // 1 DAY REMINDER
-      // -----------------------------
-      if (
-        expiresIn > 0 &&
-        expiresIn <= oneDay &&
-        !membership.oneDayReminderSent
-      ) {
-        const user = await client.users
-          .fetch(membership.userId)
-          .catch(() => null);
-
-        if (user) {
-          await user.send(
-            `**Hey ${user.username}! 👋**\n\n` +
-            `Your **${
-              membership.type === 'monthly'
-                ? 'Monthly Membership'
-                : 'Yearly Membership'
-            }** will expire **tomorrow**.\n\n` +
-            `**Expires:** <t:${Math.floor(
-              membership.expiresAt.getTime() / 1000
-            )}:F>\n\n` +
-            `To keep your membership active without interruption, please **DM Ace** today to renew it.\n\n` +
-            `Thank you for supporting **Ace's Apex**! ❤️`
-          );
-
-          await logDM(
-            client,
-            '1-Day Reminder',
-            null,
-            user,
-            `Membership expires on <t:${Math.floor(
-              membership.expiresAt.getTime() / 1000
-            )}:F>`
-          );
-
-          membership.oneDayReminderSent = true;
-          await membership.save();
-        }
+      if (now.getTime() >= oneDay && now < membership.expiresAt && !membership.oneDayReminderSent) {
+        const claimed = await Membership.findOneAndUpdate({ _id: membership._id, oneDayReminderSent: false }, { $set: { oneDayReminderSent: true } }, { new: true });
+        if (claimed && !(await sendMembershipDM(client, membership, '1 day remaining', `Your ${membership.type} membership expires tomorrow.`))) await Membership.updateOne({ _id: membership._id }, { $set: { oneDayReminderSent: false } });
       }
 
-      // -----------------------------
-      // EXPIRED
-      // -----------------------------
-      if (
-        expiresIn <= 0 &&
-        !membership.expiryReminderSent
-      ) {
-        // ----------------------------------------
-        // REMOVE ROLE USING REST API
-        // No GuildMembers intent required
-        // ----------------------------------------
-        if (membership.roleId) {
-          try {
-            await client.rest.delete(
-              Routes.guildMemberRole(
-                membership.guildId,
-                membership.userId,
-                membership.roleId
-              )
-            );
-
-            console.log(
-              `✅ Membership role removed from ${membership.userId}`
-            );
-          } catch (error) {
-            console.error(
-              `Failed to remove membership role from ${membership.userId}:`,
-              error
-            );
-          }
+      if (now >= membership.expiresAt && !membership.expiryReminderSent) {
+        const claimed = await Membership.findOneAndUpdate({ _id: membership._id, expiryReminderSent: false }, { $set: { expiryReminderSent: true } }, { new: true });
+        if (!claimed) continue;
+        if (member && membership.roleId) {
+          await client.rest.delete(Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)).catch(error => {
+            if (error?.status !== 404) console.error('Failed to remove expired membership role:', error);
+          });
         }
-
-        // ----------------------------------------
-        // EXPIRY DM
-        // ----------------------------------------
-        const user = await client.users
-          .fetch(membership.userId)
-          .catch(() => null);
-
-        if (user) {
-          await user.send(
-            `**Hey ${user.username}! 👋**\n\n` +
-            `Your **${
-              membership.type === 'monthly'
-                ? 'Monthly Membership'
-                : 'Yearly Membership'
-            }** has now expired.\n\n` +
-            `Your membership benefits have been removed.\n\n` +
-            `If you'd like to become a member again, please **DM Ace** to renew your membership.\n\n` +
-            `Thank you for supporting **Ace's Apex**! ❤️`
-          );
-
-          await logDM(
-            client,
-            'Membership Expired',
-            null,
-            user,
-            `Membership expired on <t:${Math.floor(
-              membership.expiresAt.getTime() / 1000
-            )}:F>`
-          );
-        }
-
-        // ----------------------------------------
-        // MARK MEMBERSHIP AS EXPIRED
-        // ----------------------------------------
-        membership.expiryReminderSent = true;
-        membership.roleId = null;
-
-        await membership.save();
-
-        console.log(
-          `Membership expired for ${membership.userId}`
-        );
+        await sendMembershipDM(client, membership, 'Membership expired', `Your ${membership.type} membership has expired.`);
+        await Membership.deleteOne({ _id: membership._id });
       }
     } catch (error) {
-      console.error(
-        'Failed to process membership:',
-        error
-      );
+      console.error(`Failed to process membership ${membership._id}:`, error);
     }
+  }
+}
+
+async function sendMembershipDM(client, membership, title, message) {
+  try {
+    const user = await client.users.fetch(membership.userId);
+    await user.send(`**${title}**\n\n${message}`);
+    return true;
+  } catch (error) {
+    console.error(`Failed to DM membership user ${membership.userId}:`, error);
+    return false;
   }
 }

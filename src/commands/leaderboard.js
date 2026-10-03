@@ -7,6 +7,7 @@ import {
 } from 'discord.js';
 import { getSeasonLeaderboard } from '../services/leaderboardService.js';
 import { createLeaderboardEmbed } from '../utils/embeds.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 const USERS_PER_PAGE = 10;
 
@@ -16,7 +17,8 @@ export default {
     .setDescription('Display the current season standings'),
   
   async execute(interaction) {
-    const leaderboard = await getSeasonLeaderboard();
+    const season = await getCurrentSeason();
+    const leaderboard = await getSeasonLeaderboard(season);
     
     if (leaderboard.length === 0) {
       return interaction.reply({
@@ -45,7 +47,7 @@ export default {
     };
     
     const response = await interaction.reply({
-      embeds: [createLeaderboardEmbed(leaderboard, currentPage, USERS_PER_PAGE)],
+      embeds: [createLeaderboardEmbed(leaderboard, currentPage, USERS_PER_PAGE, season)],
       components: getComponents(currentPage),
     });
     
@@ -68,7 +70,7 @@ export default {
       if (i.customId === 'next') currentPage++;
       
       await i.update({
-        embeds: [createLeaderboardEmbed(leaderboard, currentPage, USERS_PER_PAGE)],
+        embeds: [createLeaderboardEmbed(leaderboard, currentPage, USERS_PER_PAGE, season)],
         components: getComponents(currentPage),
       });
     });

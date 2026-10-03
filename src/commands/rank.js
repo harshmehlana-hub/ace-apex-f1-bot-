@@ -2,6 +2,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { getUserRank } from '../services/leaderboardService.js';
 import { User } from '../database/models/User.js';
 import { createRankEmbed } from '../utils/embeds.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -16,37 +17,18 @@ export default {
   
   async execute(interaction) {
     const targetUser = interaction.options.getUser('user') || interaction.user;
+    const season = await getCurrentSeason();
+    const rankData = await getUserRank(targetUser.id, season);
     
-    const rankData = await getUserRank(targetUser.id);
-    
-    if (!rankData || !rankData.user) {
-      // Create user entry if they don't exist
-      const user = await User.findOneAndUpdate(
-        { discordId: targetUser.id },
-        {
-          $setOnInsert: {
-            discordId: targetUser.id,
-            username: targetUser.username,
-            totalPoints: 0,
-            perfectPredictions: 0,
-            pointsReachedAt: new Date(),
-          },
-        },
-        { upsert: true, new: true }
-      );
-      
+    if (!rankData || !rankData.standing) {
       return interaction.reply({
-        embeds: [createRankEmbed(
-          { username: targetUser.username, totalPoints: 0, perfectPredictions: 0 },
-          'Unranked',
-          0
-        )],
+        embeds: [createRankEmbed({ username: targetUser.username, totalPoints: 0, perfectPredictions: 0 }, 'Unranked', 0, season)],
       });
     }
-    
-    rankData.user.username = targetUser.username; // Ensure current username
-    const embed = createRankEmbed(rankData.user, rankData.rank, rankData.totalUsers);
-    
+
+    const rankUser = { username: targetUser.username, totalPoints: rankData.standing.totalPoints, perfectPredictions: rankData.standing.perfectPodiums };
+    const embed = createRankEmbed(rankUser, rankData.rank, rankData.totalUsers, season);
+
     await interaction.reply({ embeds: [embed] });
   },
 };

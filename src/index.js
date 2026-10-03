@@ -25,12 +25,13 @@ import qualifyingresultCommand from './commands/qualifyingresult.js';
 import deletequalifyingCommand from './commands/deletequalifying.js';
 import predictionstatsCommand from './commands/predictionstats.js';
 import remindCommand from './commands/remind.js';
-import announcementCommand from './commands/announcement.js';
 import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
 import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
+import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
+import { runDataMigrations } from './services/dataMigrationService.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -68,7 +69,7 @@ qualifyingresultCommand,
 deletequalifyingCommand,
 predictionstatsCommand,
 remindCommand,
-announcementCommand,
+recalculatequalifyingCommand,
 grantmembershipCommand,
 membershipinfoCommand,
 deletemembershipCommand,
@@ -121,6 +122,8 @@ async function main() {
 
     await connectDatabase();
     console.log('Connected to MongoDB');
+    await runDataMigrations();
+    console.log('Database integrity migration completed');
 
 console.log("DISCORD_TOKEN:", process.env.DISCORD_TOKEN ? "FOUND" : "NOT FOUND");
 console.log("config.token exists:", !!config.token);

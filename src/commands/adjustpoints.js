@@ -1,101 +1,54 @@
-import {
-  SlashCommandBuilder,
-  PermissionFlagsBits,
-} from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { User } from '../database/models/User.js';
+import { PointTransaction } from '../database/models/PointTransaction.js';
+import { getCurrentSeason } from '../services/seasonService.js';
+import { rebuildSeasonStanding } from '../services/seasonStandingService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { runInTransaction } from '../services/scoringService.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('adjustpoints')
     .setDescription('Add or remove points from a user (Admin only)')
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('User to adjust points for')
-        .setRequired(true)
-    )
-    .addIntegerOption(option =>
-      option
-        .setName('points')
-        .setDescription('Points to add/remove (use negative numbers to remove)')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('reason')
-        .setDescription('Reason for adjustment')
-        .setRequired(false)
-    )
+    .addUserOption(option => option.setName('user').setDescription('User to adjust points for').setRequired(true))
+    .addIntegerOption(option => option.setName('points').setDescription('Points to add/remove').setRequired(true))
+    .addStringOption(option => option.setName('reason').setDescription('Reason for adjustment').setRequired(false))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
-    if (!isAdmin(interaction.member, config.roles.admin)) {
-      return interaction.reply({
-        content: '❌ You do not have permission to use this command.',
-        ephemeral: true,
-      });
-    }
-
+    if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     const targetUser = interaction.options.getUser('user');
-    const points = interaction.options.getInteger('points');
-    const reason =
-      interaction.options.getString('reason') || 'No reason provided';
+    const requestedPoints = interaction.options.getInteger('points');
+    const reason = interaction.options.getString('reason') || 'No reason provided';
+    const season = await getCurrentSeason();
 
-    let user = await User.findOne({
-      discordId: targetUser.id,
+    const user = await User.findOneAndUpdate({ discordId: targetUser.id }, { $set: { username: targetUser.username } }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    const currentStanding = await rebuildSeasonStanding(targetUser.id, season);
+    let amount = requestedPoints;
+    if (currentStanding.totalPoints + amount < 0) amount = -currentStanding.totalPoints;
+
+    if (amount === 0) return interaction.reply({ content: '❌ This adjustment would not change the user\'s season score.', ephemeral: true });
+
+    await runInTransaction(async session => {
+      await PointTransaction.create([{
+        userId: user.discordId,
+        season,
+        amount,
+        sourceType: 'admin_adjustment',
+        sourceId: `${interaction.id}:${Date.now()}`,
+        reason,
+        createdBy: interaction.user.id,
+      }], { session });
+      await rebuildSeasonStanding(user.discordId, season, { session });
     });
 
-    if (!user) {
-      user = await User.create({
-        discordId: targetUser.id,
-        username: targetUser.username,
-        totalPoints: 0,
-        perfectPredictions: 0,
-        pointsReachedAt: new Date(),
-      });
-    }
-
-    const oldPoints = user.totalPoints;
-
-    user.totalPoints += points;
-
-    if (user.totalPoints < 0) {
-      user.totalPoints = 0;
-    }
-
-    user.pointsReachedAt = new Date();
-
-    await user.save();
-
+    const updated = await rebuildSeasonStanding(targetUser.id, season);
     try {
-      const logsChannel = await client.channels.fetch(
-        config.channels.logs
-      );
+      const logsChannel = await client.channels.fetch(config.channels.logs);
+      if (logsChannel) await logsChannel.send(`📝 **Points Adjusted**\n👤 User: <@${targetUser.id}>\n⚙️ Admin: <@${interaction.user.id}>\n📈 Change: ${amount > 0 ? '+' : ''}${amount}\n🏆 Season ${season}: ${currentStanding.totalPoints} → ${updated.totalPoints}\n📄 Reason: ${reason}`);
+    } catch (error) { console.error('Failed to send log message:', error); }
 
-      if (logsChannel) {
-        await logsChannel.send(
-          `📝 **Points Adjusted**\n` +
-            `👤 User: <@${targetUser.id}>\n` +
-            `⚙️ Admin: <@${interaction.user.id}>\n` +
-            `📈 Change: ${points > 0 ? '+' : ''}${points}\n` +
-            `🏆 Total: ${oldPoints} → ${user.totalPoints}\n` +
-            `📄 Reason: ${reason}`
-        );
-      }
-    } catch (error) {
-      console.error('Failed to send log message:', error);
-    }
-
-    await interaction.reply({
-      content:
-        `✅ **Points Updated Successfully**\n\n` +
-        `👤 User: <@${targetUser.id}>\n` +
-        `📈 Change: ${points > 0 ? '+' : ''}${points}\n` +
-        `🏆 Total: ${oldPoints} → ${user.totalPoints}\n` +
-        `📄 Reason: ${reason}`,
-      ephemeral: true,
-    });
+    await interaction.reply({ content: `✅ **Season points updated**\n\n👤 User: <@${targetUser.id}>\n📅 Season: ${season}\n📈 Change: ${amount > 0 ? '+' : ''}${amount}\n🏆 Total: ${currentStanding.totalPoints} → ${updated.totalPoints}\n📄 Reason: ${reason}`, ephemeral: true });
   },
 };

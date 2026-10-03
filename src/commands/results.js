@@ -1,237 +1,82 @@
-import {
-  SlashCommandBuilder,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
-  ComponentType,
-  PermissionFlagsBits,
-} from 'discord.js';
-
+import { SlashCommandBuilder, ActionRowBuilder, StringSelectMenuBuilder, ComponentType, PermissionFlagsBits } from 'discord.js';
 import { Race } from '../database/models/Race.js';
 import { Result } from '../database/models/Result.js';
-
-import { processRaceResults } from '../services/scoringService.js';
-import { updatePredictorOfTheWeekRole } from '../services/roleService.js';
-
+import { processRaceResults, runInTransaction } from '../services/scoringService.js';
+import { reconcilePredictorOfTheWeekRoles } from '../services/roleService.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { createResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName('results')
-    .setDescription('Enter official race results')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+  data: new SlashCommandBuilder().setName('results').setDescription('Enter official race results').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
-    if (!isAdmin(interaction.member, config.roles.admin)) {
-      return interaction.reply({
-        content: '❌ You do not have permission to use this command.',
-        ephemeral: true,
-      });
-    }
+    if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
+    const closedRaces = await Race.find({ status: 'closed' }).sort({ raceStartTime: 1 });
+    if (!closedRaces.length) return interaction.reply({ content: '❌ There are no races awaiting results.', ephemeral: true });
 
-    const closedRaces = await Race.find({ status: 'closed' });
-
-    if (closedRaces.length === 0) {
-      return interaction.reply({
-        content: '❌ There are no races awaiting results.',
-        ephemeral: true,
-      });
-    }
-
-    const raceOptions = closedRaces.map(race => ({
-      label: race.name,
-      value: race._id.toString(),
-    }));
-
-    const raceMenu = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder()
-        .setCustomId('race_select')
-        .setPlaceholder('Select race')
-        .addOptions(raceOptions)
-    );
-
-    await interaction.reply({
-      content: '🏁 Select a race:',
-      components: [raceMenu],
-      ephemeral: true,
-    });
-
+    const raceMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('race_select').setPlaceholder('Select race').addOptions(closedRaces.slice(0, 25).map(r => ({ label: r.name, description: `Season ${r.season}`, value: String(r._id) }))));
+    await interaction.reply({ content: '🏁 Select a race:', components: [raceMenu], ephemeral: true });
     const response = await interaction.fetchReply();
 
     try {
-      const raceInteraction = await response.awaitMessageComponent({
-        componentType: ComponentType.StringSelect,
-        time: 60000,
+      const raceInteraction = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const race = closedRaces.find(r => String(r._id) === raceInteraction.values[0]);
+      if (!race) return raceInteraction.update({ content: '❌ Race not found.', components: [] });
+      if (await Result.exists({ raceId: race._id })) return raceInteraction.update({ content: '❌ This race already has a result. Use `/recalculateresults` to correct it.', components: [] });
+
+      const drivers = getDriverSelectOptions();
+      const makeMenu = (id, placeholder, excluded = []) => new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(id).setPlaceholder(placeholder).addOptions(drivers.filter(d => !excluded.includes(d.value))));
+      await raceInteraction.update({ content: `🏁 ${race.name}\n\n🥇 Select Official P1`, components: [makeMenu('p1', 'Select Official P1')] });
+      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p1 = p1I.values[0];
+      await p1I.update({ content: `🏁 ${race.name}\n🥇 P1: ${p1}\n\n🥈 Select Official P2`, components: [makeMenu('p2', 'Select Official P2', [p1])] });
+      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p2 = p2I.values[0];
+      await p2I.update({ content: `🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n\n🥉 Select Official P3`, components: [makeMenu('p3', 'Select Official P3', [p1, p2])] });
+      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p3 = p3I.values[0];
+
+      const resultData = { p1Driver: p1, p2Driver: p2, p3Driver: p3 };
+      const scores = await runInTransaction(async session => {
+        const result = await Result.create([{ raceId: race._id, ...resultData, enteredBy: interaction.user.id }], { session });
+        const created = result[0];
+
+        // Mark the event completed BEFORE rebuilding standings. The standings
+        // rebuild intentionally only counts completed events.
+        const statusUpdate = await Race.updateOne(
+          { _id: race._id, status: 'closed' },
+          { $set: { status: 'completed' } },
+          { session }
+        );
+        if (statusUpdate.modifiedCount !== 1) {
+          throw new Error('Race status changed before result processing could complete.');
+        }
+
+        const scored = await processRaceResults(race, created, { session });
+        const topPredictorIds = scored.slice(0, 5).map(s => s.userId);
+        await Race.updateOne(
+          { _id: race._id },
+          { $set: { predictorOfTheWeekIds: topPredictorIds } },
+          { session }
+        );
+        return scored;
       });
 
-      const raceId = raceInteraction.values[0];
-      const race = closedRaces.find(
-        r => r._id.toString() === raceId
-      );
-
-      const driverOptions = getDriverSelectOptions();
-
-      // P1
-      const p1Menu = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('p1')
-          .setPlaceholder('Select Official P1')
-          .addOptions(driverOptions)
-      );
-
-      await raceInteraction.update({
-        content: `🏁 ${race.name}\n\n🥇 Select Official P1`,
-        components: [p1Menu],
-      });
-
-      const p1Interaction = await response.awaitMessageComponent({
-        componentType: ComponentType.StringSelect,
-        time: 60000,
-      });
-
-      const p1Driver = p1Interaction.values[0];
-
-      // P2
-      const p2Menu = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('p2')
-          .setPlaceholder('Select Official P2')
-          .addOptions(
-            driverOptions.filter(
-              d => d.value !== p1Driver
-            )
-          )
-      );
-
-      await p1Interaction.update({
-        content:
-          `🏁 ${race.name}\n\n` +
-          `🥇 P1: ${p1Driver}\n\n` +
-          `🥈 Select Official P2`,
-        components: [p2Menu],
-      });
-
-      const p2Interaction = await response.awaitMessageComponent({
-        componentType: ComponentType.StringSelect,
-        time: 60000,
-      });
-
-      const p2Driver = p2Interaction.values[0];
-
-      // P3
-      const p3Menu = new ActionRowBuilder().addComponents(
-        new StringSelectMenuBuilder()
-          .setCustomId('p3')
-          .setPlaceholder('Select Official P3')
-          .addOptions(
-            driverOptions.filter(
-              d =>
-                d.value !== p1Driver &&
-                d.value !== p2Driver
-            )
-          )
-      );
-
-      await p2Interaction.update({
-        content:
-          `🏁 ${race.name}\n\n` +
-          `🥇 P1: ${p1Driver}\n` +
-          `🥈 P2: ${p2Driver}\n\n` +
-          `🥉 Select Official P3`,
-        components: [p3Menu],
-      });
-
-      const p3Interaction = await response.awaitMessageComponent({
-        componentType: ComponentType.StringSelect,
-        time: 60000,
-      });
-
-      const p3Driver = p3Interaction.values[0];
-
-      await p3Interaction.deferUpdate();
-
-      const result = await Result.create({
-        raceId,
-        p1Driver,
-        p2Driver,
-        p3Driver,
-      });
-
-      const scores = await processRaceResults(
-        raceId,
-        result
-      );
-
-      race.status = 'completed';
-      
-
-      const topPredictorIds = scores
-  .slice(0, 5)
-  .map(s => s.userId);
-
-// Get the previous Predictor of the Week users
-const previousRace = await Race.findOne({
-  season: race.season,
-  status: 'completed',
-  _id: { $ne: race._id },
-}).sort({ createdAt: -1 });
-
-const previousPredictorIds =
-  previousRace?.predictorOfTheWeekIds || [];
-
-await updatePredictorOfTheWeekRole(
-  interaction.guild,
-  topPredictorIds,
-  previousPredictorIds
-);
-
-// Save the new Predictor of the Week users
-race.predictorOfTheWeekIds = topPredictorIds;
-await race.save();
+      const topPredictorIds = scores.slice(0, 5).map(s => s.userId);
+      await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
 
       try {
-        const resultsChannel = await client.channels.fetch(
-          config.channels.results
-        );
+        const resultsChannel = await client.channels.fetch(config.channels.results);
+        if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scores)] });
+      } catch (error) { console.error('Failed to publish race results:', error); }
 
-        if (resultsChannel) {
-          const embed = createResultsEmbed(
-            race,
-            result,
-            scores
-          );
-
-          await resultsChannel.send({
-            content: '@everyone 🏎️ Race Results are OUT!',
-            embeds: [embed],
-          });
-        }
-      } catch (err) {
-        console.error(err);
-      }
-
-      await interaction.editReply({
-        content:
-          `✅ Results processed successfully!\n\n` +
-          `🏁 ${race.name}\n` +
-          `🥇 P1: ${p1Driver}\n` +
-          `🥈 P2: ${p2Driver}\n` +
-          `🥉 P3: ${p3Driver}\n\n` +
-          `📊 ${scores.length} predictions scored.`,
-        components: [],
-      });
-
+      await p3I.update({ content: `✅ Results processed successfully!\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.`, components: [] });
     } catch (error) {
       console.error(error);
-
-      try {
-        await interaction.editReply({
-          content: '⏰ Results entry timed out.',
-          components: [],
-        });
-      } catch {}
+      if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Results entry timed out.', components: [] });
+      else if (!interaction.replied) await interaction.reply({ content: '❌ Failed to process the result. No partial score should have been committed.', ephemeral: true }).catch(() => {});
     }
   },
 };

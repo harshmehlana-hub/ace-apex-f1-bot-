@@ -1,136 +1,55 @@
-import {
-  SlashCommandBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType,
-  PermissionFlagsBits,
-} from 'discord.js';
-
-import { User } from '../database/models/User.js';
+import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ComponentType, PermissionFlagsBits } from 'discord.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { getCurrentSeason, startNewSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('resetseason')
-    .setDescription('Start a new season while preserving historical data')
-    .setDefaultMemberPermissions(
-      PermissionFlagsBits.Administrator
-    ),
+    .setDescription('Switch the bot to a new season without modifying historical data')
+    .addStringOption(option => option.setName('season').setDescription('New season year (e.g. 2027)').setRequired(true))
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
     if (!isAdmin(interaction.member, config.roles.admin)) {
-      return interaction.reply({
-        content:
-          '❌ You do not have permission to use this command.',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     }
 
-    const confirmRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('confirm_reset')
-        .setLabel('Start New Season')
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId('cancel_reset')
-        .setLabel('Cancel')
-        .setStyle(ButtonStyle.Secondary)
-    );
+    const newSeason = interaction.options.getString('season').trim();
+    if (!/^\d{4}$/.test(newSeason)) {
+      return interaction.reply({ content: '❌ Season must be a four-digit year.', ephemeral: true });
+    }
+    const currentSeason = await getCurrentSeason();
+    if (newSeason === currentSeason) {
+      return interaction.reply({ content: `❌ ${newSeason} is already the active season.`, ephemeral: true });
+    }
 
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId('confirm_reset').setLabel('Switch Season').setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId('cancel_reset').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
+    );
     const response = await interaction.reply({
-      content:
-        '⚠️ **SEASON ROLLOVER**\n\n' +
-        'This will start a new season.\n\n' +
-        '✅ Historical races will be preserved\n' +
-        '✅ Historical predictions will be preserved\n' +
-        '✅ Historical results will be preserved\n' +
-        '✅ Historical qualifying data will be preserved\n' +
-        '✅ Season standings will be preserved\n\n' +
-        '⚠️ Current leaderboard points will be reset to zero.\n\n' +
-        'Are you sure you want to continue?',
-      components: [confirmRow],
-      ephemeral: true,
+      content: `⚠️ **SEASON SWITCH**\n\nCurrent season: **${currentSeason}**\nNew season: **${newSeason}**\n\nHistorical races, predictions, results and standings will remain untouched. New predictions and leaderboards will use ${newSeason}.\n\nContinue?`,
+      components: [row], ephemeral: true,
     });
 
     try {
-      const confirmInteraction =
-        await response.awaitMessageComponent({
-          componentType: ComponentType.Button,
-          time: 30000,
-        });
+      const confirm = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 30000 });
+      if (confirm.customId === 'cancel_reset') return confirm.update({ content: '❌ Season switch cancelled.', components: [] });
 
-      if (confirmInteraction.customId === 'cancel_reset') {
-        return confirmInteraction.update({
-          content: '❌ Season rollover cancelled.',
-          components: [],
-        });
-      }
-
-      const doubleConfirmRow =
-        new ActionRowBuilder().addComponents(
-          new ButtonBuilder()
-            .setCustomId('final_confirm')
-            .setLabel('CONFIRM NEW SEASON')
-            .setStyle(ButtonStyle.Danger),
-          new ButtonBuilder()
-            .setCustomId('final_cancel')
-            .setLabel('Cancel')
-            .setStyle(ButtonStyle.Secondary)
-        );
-
-      await confirmInteraction.update({
-        content:
-          '🚨 **FINAL CONFIRMATION**\n\n' +
-          'Historical data will be preserved.\n' +
-          'Current leaderboard points will be reset.\n\n' +
-          'Click CONFIRM NEW SEASON to proceed.',
-        components: [doubleConfirmRow],
-      });
-
-      const finalInteraction =
-        await response.awaitMessageComponent({
-          componentType: ComponentType.Button,
-          time: 15000,
-        });
-
-      if (finalInteraction.customId === 'final_cancel') {
-        return finalInteraction.update({
-          content: '❌ Season rollover cancelled.',
-          components: [],
-        });
-      }
-
-      await User.updateMany(
-        {},
-        {
-          totalPoints: 0,
-          perfectPredictions: 0,
-          pointsReachedAt: new Date(),
-        }
+      const finalRow = new ActionRowBuilder().addComponents(
+        new ButtonBuilder().setCustomId('final_confirm').setLabel('CONFIRM SEASON SWITCH').setStyle(ButtonStyle.Danger),
+        new ButtonBuilder().setCustomId('final_cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
       );
+      await confirm.update({ content: `🚨 **FINAL CONFIRMATION**\n\nSwitch active season from **${currentSeason}** to **${newSeason}**?`, components: [finalRow] });
+      const final = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 15000 });
+      if (final.customId === 'final_cancel') return final.update({ content: '❌ Season switch cancelled.', components: [] });
 
-      await finalInteraction.update({
-        content:
-          '✅ **New season started successfully.**\n\n' +
-          'Historical data has been preserved.\n' +
-          'Leaderboard points have been reset for the new season.',
-        components: [],
-      });
-
+      await startNewSeason(newSeason);
+      await final.update({ content: `✅ **Season ${newSeason} is now active.**\n\nHistorical season data was not reset or deleted.`, components: [] });
     } catch (error) {
-      if (
-        error.code === 'InteractionCollectorError'
-      ) {
-        await interaction.editReply({
-          content:
-            '⏰ Confirmation timed out. Season rollover cancelled.',
-          components: [],
-        });
-      } else {
-        throw error;
-      }
+      if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Confirmation timed out. Season switch cancelled.', components: [] });
+      else throw error;
     }
   },
 };

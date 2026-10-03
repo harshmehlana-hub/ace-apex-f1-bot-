@@ -7,6 +7,7 @@ import { QualifyingPrediction } from '../database/models/QualifyingPrediction.js
 
 import { config } from '../config.js';
 import { getSeasonRank } from '../services/leaderboardService.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 import { createPredictionStatsEmbed } from '../utils/embeds.js';
 
 export default {
@@ -31,9 +32,7 @@ export default {
       interaction.options.getUser('user') ||
       interaction.user;
 
-    const season =
-      interaction.options.getString('season') ||
-      config.season;
+    const season = interaction.options.getString('season') || await getCurrentSeason();
 
     const user = await User.findOne({
       discordId: targetUser.id,

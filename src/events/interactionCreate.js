@@ -1,3 +1,7 @@
+import { auditAdminCommand } from '../services/auditService.js';
+import { config } from '../config.js';
+import { isAdmin } from '../utils/validators.js';
+
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
@@ -10,9 +14,13 @@ export default {
         return;
       }
       
+      const adminAction = interaction.inGuild() && isAdmin(interaction.member, config.roles.admin);
+      if (adminAction) await auditAdminCommand(interaction, 'started');
       try {
         await command.execute(interaction, client);
+        if (adminAction) await auditAdminCommand(interaction, 'completed');
       } catch (error) {
+        if (adminAction) await auditAdminCommand(interaction, 'failed', error);
         console.error(`Error executing ${interaction.commandName}:`, error);
         
         const errorMessage = {

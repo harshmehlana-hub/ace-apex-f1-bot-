@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node src/index.js",
     "deploy": "node src/deploy-commands.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "backup": "node scripts/backup.js",
+    "restore": "node scripts/restore.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1",

@@ -1,7 +1,8 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { Race } from '../database/models/Race.js';
 import { config } from '../config.js';
-import { isAdmin } from '../utils/validators.js';
+import { isAdmin, parseISTDateTime } from '../utils/validators.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -36,41 +37,27 @@ export default {
       });
     }
     
-    const name = interaction.options.getString('name');
+    const name = interaction.options.getString('name').trim();
     const dateStr = interaction.options.getString('date');
     const timeStr = interaction.options.getString('time');
-    
-   // Parse DD-MM-YYYY and IST time
-const [day, month, year] = dateStr.split('-').map(Number);
-const [hours, minutes] = timeStr.split(':').map(Number);
+    const raceStartTime = parseISTDateTime(dateStr, timeStr);
 
-// Convert IST to UTC for storage
-const raceStartTime = new Date(
-  Date.UTC(
-    year,
-    month - 1,
-    day,
-    hours - 5,
-    minutes - 30
-  )
-);
-    
-    if (isNaN(raceStartTime.getTime())) {
+    if (!raceStartTime) {
       return interaction.reply({
-        content: '❌ Invalid date or time format. Use YYYY-MM-DD for date and HH:MM for time.',
+        content: '❌ Invalid date/time. Use DD-MM-YYYY and HH:MM in IST, and enter a real calendar date.',
         ephemeral: true,
       });
     }
-    
-    // Check if race already exists
-    const existingRace = await Race.findOne({ name });
+
+    const season = await getCurrentSeason();
+    const existingRace = await Race.findOne({ season, name });
     if (existingRace) {
       return interaction.reply({
-        content: `❌ A race with the name "${name}" already exists.`,
+        content: `❌ A race named "${name}" already exists in season ${season}.`,
         ephemeral: true,
       });
     }
-    
+
     // Calculate prediction window times
     const predictionOpenTime = new Date(raceStartTime.getTime() - config.timing.openBefore);
     const predictionCloseTime = new Date(raceStartTime.getTime() - config.timing.closeBefore);
@@ -86,7 +73,7 @@ const raceStartTime = new Date(
     
     const race = new Race({
       name,
-      season: config.season,
+      season,
       raceStartTime,
       predictionOpenTime,
       predictionCloseTime,

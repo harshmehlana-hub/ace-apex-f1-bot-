@@ -12,6 +12,7 @@ import { getOrCreateSeasonStanding } from '../services/seasonStandingService.js'
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { validatePodiumSelection } from '../utils/validators.js';
 import { config } from '../config.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -19,7 +20,8 @@ export default {
     .setDescription('Submit your podium prediction'),
 
   async execute(interaction, client) {
-    const openRaces = await Race.find({ status: 'open' });
+    const activeSeason = await getCurrentSeason();
+    const openRaces = await Race.find({ season: activeSeason, status: 'open' }).sort({ raceStartTime: 1 }).limit(25);
 
     if (openRaces.length === 0) {
       return interaction.reply({
@@ -56,7 +58,10 @@ export default {
       });
 
       const raceId = raceInteraction.values[0];
-      const race = await Race.findById(raceId);
+      const race = await Race.findOne({ _id: raceId, season: activeSeason });
+      if (!race || race.status !== 'open' || new Date() < race.predictionOpenTime || new Date() >= race.predictionCloseTime) {
+        return raceInteraction.update({ content: '❌ Predictions for this race are no longer open.', components: [] });
+      }
 
       const existingPrediction = await Prediction.findOne({
         userId: interaction.user.id,
@@ -167,13 +172,8 @@ export default {
         submittedAt: new Date(),
       });
 
-const standing = await getOrCreateSeasonStanding(
-  interaction.user.id,
-  race.season
-);
-
+const standing = await getOrCreateSeasonStanding(interaction.user.id, race.season);
 standing.racePredictionsSubmitted += 1;
-
 await standing.save();
       await User.findOneAndUpdate(
         { discordId: interaction.user.id },
@@ -181,9 +181,6 @@ await standing.save();
           $setOnInsert: {
             discordId: interaction.user.id,
             username: interaction.user.username,
-            totalPoints: 0,
-            perfectPredictions: 0,
-            pointsReachedAt: new Date(),
           },
         },
         { upsert: true }

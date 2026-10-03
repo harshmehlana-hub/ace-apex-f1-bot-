@@ -143,9 +143,13 @@ export default {
     // ----------------------------------------
     // FIND EXISTING MEMBERSHIP
     // ----------------------------------------
-    let membership = await Membership.findOne({
-      userId: user.id,
-    });
+    let membership = await Membership.findOne({ userId: user.id });
+
+    if (membership?.roleId && membership.roleId !== roleId) {
+      await client.rest.delete(Routes.guildMemberRole(interaction.guild.id, user.id, membership.roleId)).catch(error => {
+        if (error?.status !== 404) console.error('Failed to remove previous membership role:', error);
+      });
+    }
 
     const now = new Date();
 
