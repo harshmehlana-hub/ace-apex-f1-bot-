@@ -35,21 +35,51 @@ export async function processRaceResults(race, result, options = {}) {
   const session = options.session || null;
   const predictions = await Prediction.find({ raceId: race._id }).session(session);
 
-  for (const prediction of predictions) {
+  const predictionUpdates = predictions.map(prediction => {
     const { points } = calculateScore(prediction, result);
     prediction.pointsAwarded = points;
-    await prediction.save({ session });
-    await upsertTransaction({
-      userId: prediction.userId,
-      season: prediction.season,
-      sourceType: 'race_result',
-      sourceId: String(race._id),
-      amount: points,
-      reason: `${race.name} race result`,
-    }, session);
-  }
+    return prediction;
+  });
 
-  await rebuildAllSeasonStandings(race.season, { session });
+  if (predictionUpdates.length) {
+    await Prediction.bulkWrite(
+      predictionUpdates.map(prediction => ({
+        updateOne: {
+          filter: { _id: prediction._id },
+          update: { $set: { pointsAwarded: prediction.pointsAwarded } },
+        },
+      })),
+      { session }
+    );
+
+    await PointTransaction.bulkWrite(
+      predictionUpdates.map(prediction => ({
+        updateOne: {
+          filter: {
+            userId: prediction.userId,
+            season: prediction.season,
+            sourceType: 'race_result',
+            sourceId: String(race._id),
+          },
+          update: {
+            $set: {
+              amount: prediction.pointsAwarded,
+              reason: `${race.name} race result`,
+              createdBy: null,
+            },
+          },
+          $setOnInsert: {
+            userId: prediction.userId,
+            season: prediction.season,
+            sourceType: 'race_result',
+            sourceId: String(race._id),
+          },
+          upsert: true,
+        },
+      })),
+      { session }
+    );
+  }
   return predictions.map(prediction => ({
     userId: prediction.userId,
     pointsAwarded: prediction.pointsAwarded,
