@@ -4,11 +4,11 @@ import { isAdmin } from '../utils/validators.js';
 
 function buildRaceWeekendAnnouncement(raceName) {
   return `@everyone
-Its race weekend again, ways to watch F1 in our server:
+Its race weekend again, ways to watch F1 in our server:\n
 Free to everyone (may lag/get full)
 Race Pass for ${raceName} (30 INR / 1.5 USD)
 Monthly Supporters membership (50 INR / 3 USD)
-Yearly Supporters membership (450 INR / 28 USD)
+Yearly Supporters membership (450 INR / 28 USD)\n
 Use \`/purchasemembership\` to get access to Race Pass or Membership.
 
 *NOTE : Race Pass and Membership are for those who want to support the server and watch the race sessions peacefully out of the chaos without lags, else free streams for race and quali will be held no need to worry.*`;
