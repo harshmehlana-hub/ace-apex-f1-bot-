@@ -14,6 +14,9 @@ const raceSchema = new mongoose.Schema({
   },
   predictorOfTheWeekIds: { type: [String], default: [] },
   announcementSent: { type: Boolean, default: false },
+  reminder12hSent: { type: Boolean, default: false },
+  reminder6hSent: { type: Boolean, default: false },
+  reminder1hSent: { type: Boolean, default: false },
   statisticsSent: { type: Boolean, default: false },
 }, { timestamps: true });
 
