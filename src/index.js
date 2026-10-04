@@ -32,6 +32,7 @@ import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
+import announcementCommand from './commands/announcement.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
 
 // Import events
@@ -78,6 +79,7 @@ deletemembershipCommand,
 privacyCommand,
 dmCommand,
   purchasemembershipCommand,
+  announcementCommand,
 ];
 
 for (const command of commands) {
