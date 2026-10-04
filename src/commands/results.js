@@ -38,6 +38,11 @@ export default {
       const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
       const p3 = p3I.values[0];
 
+      // Acknowledge the component immediately because scoring, standings,
+      // role reconciliation, and result publishing can take longer than
+      // Discord's 3-second interaction response window.
+      await p3I.deferUpdate();
+
       const resultData = { p1Driver: p1, p2Driver: p2, p3Driver: p3 };
       const scores = await runInTransaction(async session => {
         const result = await Result.create([{ raceId: race._id, ...resultData, enteredBy: interaction.user.id }], { session });
@@ -72,7 +77,7 @@ export default {
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scores)] });
       } catch (error) { console.error('Failed to publish race results:', error); }
 
-      await p3I.update({ content: `✅ Results processed successfully!\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.`, components: [] });
+      await p3I.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Results entry timed out.', components: [] });
