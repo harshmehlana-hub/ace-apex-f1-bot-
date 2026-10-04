@@ -102,9 +102,15 @@ async function processPredictionReminders(client, session, isQualifying) {
     { key: 'reminder1hSent', offset: 60 * 60 * 1000, label: '1 hour' },
   ];
 
+  const reminderWindow = 90 * 1000;
+
   for (const reminder of thresholds) {
     const reminderAt = startTime - reminder.offset;
-    if (now < reminderAt || now >= startTime || session[reminder.key]) continue;
+    if (
+      Math.abs(now - reminderAt) > reminderWindow ||
+      now >= startTime ||
+      session[reminder.key]
+    ) continue;
 
     const Model = isQualifying ? Qualifying : Race;
     const claimed = await Model.findOneAndUpdate(
@@ -126,10 +132,8 @@ async function processPredictionReminders(client, session, isQualifying) {
 
       const command = isQualifying ? '/predictqualifying' : '/predict';
       const type = isQualifying ? 'Qualifying predictions' : 'Race predictions';
-      const startTimestamp = Math.floor(startTime / 1000);
-
       await channel.send({
-        content: `@everyone ⏰ <t:${startTimestamp}:R> remaining to submit your ${type.toLowerCase()} for **${session.name}**. Use ${command} and submit now!`,
+        content: `@everyone ⏰ **${reminder.label} remaining** to submit your ${type.toLowerCase()} for **${session.name}**. Use ${command} and submit now!`,
       });
     } catch (error) {
       await Model.updateOne({ _id: session._id }, { $set: { [reminder.key]: false } });
