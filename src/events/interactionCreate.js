@@ -2,11 +2,30 @@ import { auditAdminCommand } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from '../services/purchaseMembershipService.js';
+import { handleFeedbackInteraction, handleFeedbackModal, handleFeedbackStatsInteraction } from '../services/feedbackService.js';
 
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
+      if (interaction.customId?.startsWith('feedback:')) {
+        try {
+          const handled = await handleFeedbackInteraction(interaction);
+          if (handled) return;
+        } catch (error) {
+          console.error('Error handling feedback interaction:', error);
+          if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Something went wrong with the feedback form.', ephemeral: true }).catch(() => {});
+        }
+      }
+      if (interaction.customId?.startsWith('feedbackstats:')) {
+        try {
+          const handled = await handleFeedbackStatsInteraction(interaction);
+          if (handled) return;
+        } catch (error) {
+          console.error('Error handling feedback stats interaction:', error);
+          if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Something went wrong while viewing feedback.', ephemeral: true }).catch(() => {});
+        }
+      }
       const purchaseInteraction = Object.values(purchasePrefixes).some(prefix =>
         interaction.customId?.startsWith(prefix + ':')
       );
@@ -25,6 +44,15 @@ export default {
     }
 
     if (interaction.isModalSubmit()) {
+      if (interaction.customId === 'feedback:modal') {
+        try {
+          await handleFeedbackModal(interaction);
+        } catch (error) {
+          console.error('Error handling feedback modal:', error);
+          if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Something went wrong while submitting feedback.', ephemeral: true }).catch(() => {});
+        }
+        return;
+      }
       const purchaseModal = interaction.customId?.startsWith(purchasePrefixes.PAID_PREFIX + ':');
       if (!purchaseModal) return;
 
