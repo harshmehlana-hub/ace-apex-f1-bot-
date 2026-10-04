@@ -64,6 +64,10 @@ async function updateRaceStatuses(client) {
       await race.save();
       await claimAndSendStatistics(client, race);
     }
+
+    if (desired === 'open') {
+      await processPredictionReminders(client, race, false);
+    }
   }
 }
 
@@ -81,6 +85,49 @@ async function updateQualifyingStatuses(client) {
     } else if (desired === 'closed' && qualifying.status !== 'closed') {
       qualifying.status = 'closed';
       await qualifying.save();
+    }
+
+    if (desired === 'open') {
+      await processPredictionReminders(client, qualifying, true);
+    }
+  }
+}
+
+async function processPredictionReminders(client, session, isQualifying) {
+  const now = Date.now();
+  const startTime = (isQualifying ? session.sessionStartTime : session.raceStartTime).getTime();
+  const thresholds = [
+    { key: 'reminder12hSent', offset: 12 * 60 * 60 * 1000, label: '12 hours' },
+    { key: 'reminder6hSent', offset: 6 * 60 * 60 * 1000, label: '6 hours' },
+    { key: 'reminder1hSent', offset: 60 * 60 * 1000, label: '1 hour' },
+  ];
+
+  for (const reminder of thresholds) {
+    const reminderAt = startTime - reminder.offset;
+    if (now < reminderAt || now >= startTime || session[reminder.key]) continue;
+
+    const Model = isQualifying ? Qualifying : Race;
+    const claimed = await Model.findOneAndUpdate(
+      { _id: session._id, [reminder.key]: false },
+      { $set: { [reminder.key]: true } },
+      { new: true }
+    );
+    if (!claimed) continue;
+
+    try {
+      const channel = await client.channels.fetch(config.channels.announcements);
+      if (!channel) throw new Error('Announcement channel not found');
+
+      const command = isQualifying ? '/predictqualifying' : '/predict';
+      const type = isQualifying ? 'Qualifying predictions' : 'Race predictions';
+      const startTimestamp = Math.floor(startTime / 1000);
+
+      await channel.send({
+        content: `@everyone ⏰ <t:${startTimestamp}:R> remaining to submit your ${type.toLowerCase()} for **${session.name}**. Use ${command} and submit now!`,
+      });
+    } catch (error) {
+      await Model.updateOne({ _id: session._id }, { $set: { [reminder.key]: false } });
+      console.error(`Failed to send ${isQualifying ? 'qualifying' : 'race'} prediction reminder:`, error);
     }
   }
 }
