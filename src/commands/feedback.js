@@ -1,6 +1,8 @@
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { Membership } from '../database/models/Membership.js';
+import { RacePass } from '../database/models/RacePass.js';
 
 let feedbackBroadcastRunning = false;
 
@@ -19,17 +21,27 @@ Thank you for supporting Ace's Apex! ❤️`;
 
 async function broadcastFeedback(guild, formLink, startedBy) {
   try {
-    await guild.members.fetch();
+    // Use the database as the source of truth. Enumerating guild members
+    // requires Discord's privileged Guild Members intent, which this bot
+    // intentionally does not use.
+    const now = new Date();
+    const [memberships, racePasses] = await Promise.all([
+      Membership.find({ guildId: guild.id, expiresAt: { $gt: now } }).select('userId expiresAt'),
+      RacePass.find({ guildId: guild.id, status: 'active', expiresAt: { $gt: now } }).select('userId expiresAt'),
+    ]);
 
-    const roleIds = [config.roles.supporter, config.roles.racePass].filter(Boolean);
-    const memberMap = new Map();
+    const userIds = new Set([
+      ...memberships.map(record => record.userId),
+      ...racePasses.map(record => record.userId),
+    ]);
 
-    for (const roleId of roleIds) {
-      const role = guild.roles.cache.get(roleId);
-      if (!role) continue;
-
-      for (const member of role.members.values()) {
-        if (!member.user.bot) memberMap.set(member.id, member);
+    const users = [];
+    for (const userId of userIds) {
+      try {
+        const user = await guild.client.users.fetch(userId);
+        if (!user.bot) users.push(user);
+      } catch (error) {
+        console.error('Failed to fetch user ' + userId + ' for feedback DM:', error?.message || error);
       }
     }
 
@@ -38,15 +50,15 @@ async function broadcastFeedback(guild, formLink, startedBy) {
     const sentUsers = [];
     const failedUsers = [];
 
-    for (const member of memberMap.values()) {
+    for (const user of users) {
       try {
-        await member.send(FEEDBACK_MESSAGE(formLink));
+        await user.send(FEEDBACK_MESSAGE(formLink));
         sent += 1;
-        sentUsers.push(`• ${member.user.tag} (\\${member.id}\\)`);
+        sentUsers.push('• ' + user.tag + ' (' + user.id + ')');
       } catch (error) {
         failed += 1;
-        failedUsers.push(`• ${member.user.tag} (\\${member.id}\\)`);
-        console.error(`Failed to send feedback DM to ${member.id}:`, error?.message || error);
+        failedUsers.push('• ' + user.tag + ' (' + user.id + ')');
+        console.error('Failed to send feedback DM to ' + user.id + ':', error?.message || error);
       }
     }
 
@@ -58,44 +70,28 @@ async function broadcastFeedback(guild, formLink, startedBy) {
           .setTitle('📨 Feedback DM Broadcast Completed')
           .setTimestamp()
           .addFields(
-            { name: '👮 Started by', value: startedBy.tag + '\\n\\`' + startedBy.id + '\\`', inline: true },
+            { name: '👮 Started by', value: startedBy.tag + '\n`' + startedBy.id + '`', inline: true },
             { name: '📨 DMs sent', value: String(sent), inline: true },
             { name: '❌ Failed', value: String(failed), inline: true },
-            { name: '👥 Total recipients', value: String(memberMap.size), inline: true },
+            { name: '👥 Total recipients', value: String(users.length), inline: true },
             { name: '🔗 Form', value: formLink },
           );
 
         await channel.send({ embeds: [header] });
 
-        const sendChunks = async (title, users, color) => {
-          if (!users.length) return;
+        const sendChunks = async (title, userList, color) => {
+          if (!userList.length) return;
           let chunk = '';
           let part = 1;
-          for (const user of users) {
-            if ((chunk + user + '\\n').length > 1800) {
-              await channel.send({
-                embeds: [
-                  new EmbedBuilder()
-                    .setColor(color)
-                    .setTitle(title + ` (Part ${part})`)
-                    .setDescription(chunk),
-                ],
-              });
+          for (const user of userList) {
+            if ((chunk + user + '\n').length > 1800) {
+              await channel.send({ embeds: [new EmbedBuilder().setColor(color).setTitle(title + ' (Part ' + part + ')').setDescription(chunk)] });
               chunk = '';
               part += 1;
             }
-            chunk += user + '\\n';
+            chunk += user + '\n';
           }
-          if (chunk) {
-            await channel.send({
-              embeds: [
-                new EmbedBuilder()
-                  .setColor(color)
-                  .setTitle(title + ` (Part ${part})`)
-                  .setDescription(chunk),
-              ],
-            });
-          }
+          if (chunk) await channel.send({ embeds: [new EmbedBuilder().setColor(color).setTitle(title + ' (Part ' + part + ')').setDescription(chunk)] });
         };
 
         await sendChunks('✅ DM sent to following users', sentUsers, 0x2ecc71);
@@ -105,9 +101,7 @@ async function broadcastFeedback(guild, formLink, startedBy) {
       console.error('Failed to write feedback broadcast log:', error);
     }
 
-    console.log(
-      `Feedback broadcast completed by ${startedBy.tag}: ${sent} sent, ${failed} failed, ${memberMap.size} total recipients.`
-    );
+    console.log('Feedback broadcast completed by ' + startedBy.tag + ': ' + sent + ' sent, ' + failed + ' failed, ' + users.length + ' total recipients.');
   } catch (error) {
     console.error('Feedback broadcast failed:', error);
   } finally {
