@@ -108,7 +108,13 @@ async function processPredictionReminders(client, session, isQualifying) {
 
     const Model = isQualifying ? Qualifying : Race;
     const claimed = await Model.findOneAndUpdate(
-      { _id: session._id, [reminder.key]: false },
+      {
+        _id: session._id,
+        $or: [
+          { [reminder.key]: false },
+          { [reminder.key]: { $exists: false } },
+        ],
+      },
       { $set: { [reminder.key]: true } },
       { new: true }
     );
