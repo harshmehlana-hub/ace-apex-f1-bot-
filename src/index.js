@@ -44,6 +44,7 @@ import userUpdateEvent from './events/userUpdate.js';
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.DirectMessages,
   ],
 
