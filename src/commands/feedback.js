@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 
@@ -35,15 +35,74 @@ async function broadcastFeedback(guild, formLink, startedBy) {
 
     let sent = 0;
     let failed = 0;
+    const sentUsers = [];
+    const failedUsers = [];
 
     for (const member of memberMap.values()) {
       try {
         await member.send(FEEDBACK_MESSAGE(formLink));
         sent += 1;
+        sentUsers.push(`• ${member.user.tag} (\\${member.id}\\)`);
       } catch (error) {
         failed += 1;
+        failedUsers.push(`• ${member.user.tag} (\\${member.id}\\)`);
         console.error(`Failed to send feedback DM to ${member.id}:`, error?.message || error);
       }
+    }
+
+    try {
+      const channel = await guild.client.channels.fetch(config.channels.dmLogs);
+      if (channel) {
+        const header = new EmbedBuilder()
+          .setColor(0x2ecc71)
+          .setTitle('📨 Feedback DM Broadcast Completed')
+          .setTimestamp()
+          .addFields(
+            { name: '👮 Started by', value: startedBy.tag + '\\n\\`' + startedBy.id + '\\`', inline: true },
+            { name: '📨 DMs sent', value: String(sent), inline: true },
+            { name: '❌ Failed', value: String(failed), inline: true },
+            { name: '👥 Total recipients', value: String(memberMap.size), inline: true },
+            { name: '🔗 Form', value: formLink },
+          );
+
+        await channel.send({ embeds: [header] });
+
+        const sendChunks = async (title, users, color) => {
+          if (!users.length) return;
+          let chunk = '';
+          let part = 1;
+          for (const user of users) {
+            if ((chunk + user + '\\n').length > 1800) {
+              await channel.send({
+                embeds: [
+                  new EmbedBuilder()
+                    .setColor(color)
+                    .setTitle(title + ` (Part ${part})`)
+                    .setDescription(chunk),
+                ],
+              });
+              chunk = '';
+              part += 1;
+            }
+            chunk += user + '\\n';
+          }
+          if (chunk) {
+            await channel.send({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(color)
+                  .setTitle(title + ` (Part ${part})`)
+                  .setDescription(chunk),
+              ],
+            });
+          }
+        };
+
+        await sendChunks('✅ DM sent to following users', sentUsers, 0x2ecc71);
+        await sendChunks('❌ DM failed for following users', failedUsers, 0xe74c3c);
+      }
+    } catch (error) {
+      console.error('Failed to write feedback broadcast log:', error);
     }
 
     console.log(
