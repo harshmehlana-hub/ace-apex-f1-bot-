@@ -3,6 +3,7 @@ import { Race } from '../database/models/Race.js';
 import { Result } from '../database/models/Result.js';
 import { processRaceResults, runInTransaction } from '../services/scoringService.js';
 import { reconcilePredictorOfTheWeekRoles } from '../services/roleService.js';
+import { rebuildAllSeasonStandings } from '../services/seasonStandingService.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { createResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
@@ -70,12 +71,21 @@ export default {
       });
 
       const topPredictorIds = scores.slice(0, 5).map(s => s.userId);
-      await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
 
+      // Publish the race result immediately after the scoring transaction commits.
+      // Season-standing rebuilds and role reconciliation can be expensive on large servers
+      // and should not delay the public results announcement.
       try {
         const resultsChannel = await client.channels.fetch(config.channels.results);
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scores)] });
       } catch (error) { console.error('Failed to publish race results:', error); }
+
+      try {
+        await rebuildAllSeasonStandings(race.season);
+        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
+      } catch (error) {
+        console.error('Race result post-processing failed:', error);
+      }
 
       await p3I.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.`, components: [] });
     } catch (error) {
