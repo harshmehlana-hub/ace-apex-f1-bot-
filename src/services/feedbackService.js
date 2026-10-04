@@ -15,6 +15,7 @@ import { Membership } from '../database/models/Membership.js';
 import { RacePass } from '../database/models/RacePass.js';
 import { Race } from '../database/models/Race.js';
 import { FeedbackResponse } from '../database/models/FeedbackResponse.js';
+import { FeedbackCampaign } from '../database/models/FeedbackCampaign.js';
 
 let feedbackBroadcastRunning = false;
 const sessions = new Map();
@@ -191,6 +192,11 @@ export default {
     if (!race) return interaction.reply({ content: '❌ Race not found. Please use the exact race name.', ephemeral: true });
 
     feedbackBroadcastRunning = true;
+    await FeedbackCampaign.findOneAndUpdate(
+      { guildId: interaction.guildId, raceKey: race._id.toString() },
+      { $set: { raceName: race.name, startedBy: interaction.user.id, startedAt: new Date() } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
     await interaction.reply({ content: '📨 Feedback DM broadcast started for **' + race.name + '**.', ephemeral: true });
 
     try {
@@ -258,11 +264,7 @@ function statsRows(page, total) {
 }
 
 async function getFeedbackRaces(guildId) {
-  return FeedbackResponse.aggregate([
-    { $match: { guildId } },
-    { $group: { _id: '$raceKey', raceName: { $first: '$raceName' }, latest: { $max: '$submittedAt' } } },
-    { $sort: { latest: -1 } },
-  ]);
+  return FeedbackCampaign.find({ guildId }).sort({ startedAt: -1 }).lean();
 }
 
 export const feedbackStatsCommand = {
@@ -279,7 +281,7 @@ export const feedbackStatsCommand = {
       ephemeral: true,
       components: [new ActionRowBuilder().addComponents(
         new StringSelectMenuBuilder().setCustomId(ids.statsRace).setPlaceholder('Select a race').addOptions(
-          races.slice(0, 25).map(r => ({ label: r.raceName.slice(0, 100), value: r._id }))
+          races.slice(0, 25).map(r => ({ label: r.raceName.slice(0, 100), value: r.raceKey }))
         )
       )],
     });
@@ -290,7 +292,7 @@ export async function handleFeedbackStatsInteraction(interaction) {
   if (interaction.customId === ids.statsRace) {
     if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission.', ephemeral: true });
     const raceKey = interaction.values[0];
-    const race = (await getFeedbackRaces(interaction.guildId)).find(r => r._id === raceKey);
+    const race = (await getFeedbackRaces(interaction.guildId)).find(r => r.raceKey === raceKey);
     const responses = await FeedbackResponse.find({ guildId: interaction.guildId, raceKey }).sort({ submittedAt: 1 }).lean();
     if (!race || !responses.length) return interaction.update({ content: '📊 No responses found for that race.', components: [] });
     const state = { userId: interaction.user.id, raceName: race.raceName, responses, page: 1 };
