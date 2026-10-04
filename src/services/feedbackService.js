@@ -180,15 +180,14 @@ export default {
   data: new SlashCommandBuilder()
     .setName('feedback')
     .setDescription('Send the Discord feedback form to Supporters and Race Pass holders')
-    .addStringOption(option => option.setName('race').setDescription('Race for this feedback campaign').setRequired(true)
-      .addChoices(...[])),
+    .addStringOption(option => option.setName('race').setDescription('Race for this feedback campaign').setRequired(true)),
 
   async execute(interaction) {
     if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     if (feedbackBroadcastRunning) return interaction.reply({ content: '⚠️ A feedback DM broadcast is already running. Please wait for it to finish.', ephemeral: true });
 
     const raceName = interaction.options.getString('race');
-    const race = await Race.findOne({ guildId: interaction.guildId, name: raceName }).lean();
+    const race = await Race.findOne({ name: raceName }).lean();
     if (!race) return interaction.reply({ content: '❌ Race not found. Please use the exact race name.', ephemeral: true });
 
     feedbackBroadcastRunning = true;
