@@ -34,6 +34,7 @@ import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
 import announcementCommand from './commands/announcement.js';
 import feedbackCommand from './commands/feedback.js';
+import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
 
 // Import events
@@ -82,6 +83,7 @@ dmCommand,
   purchasemembershipCommand,
   announcementCommand,
   feedbackCommand,
+  feedbackStatsCommand,
 ];
 
 for (const command of commands) {
