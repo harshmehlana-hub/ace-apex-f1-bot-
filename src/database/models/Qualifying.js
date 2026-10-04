@@ -13,6 +13,9 @@ const qualifyingSchema = new mongoose.Schema({
     index: true,
   },
   announcementSent: { type: Boolean, default: false },
+  reminder12hSent: { type: Boolean, default: false },
+  reminder6hSent: { type: Boolean, default: false },
+  reminder1hSent: { type: Boolean, default: false },
 }, { timestamps: true });
 
 qualifyingSchema.index({ season: 1, name: 1 }, { unique: true });
