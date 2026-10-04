@@ -232,7 +232,7 @@ export default {
             improvement: '',
           });
           await user.send({
-            embeds: [embed('🏁 ' + race.name + ' — Race Feedback', 'Thank you for supporting Ace\\'s Apex!\\n\\nWe\\'d love to know how your race weekend experience was.')],
+            embeds: [embed('🏁 ' + race.name + ' — Race Feedback', "Thank you for supporting Ace's Apex!\n\nWe'd love to know how your race weekend experience was.")],
             components: startRow(),
           });
           sent++;
