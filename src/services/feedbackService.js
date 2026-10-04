@@ -217,6 +217,7 @@ export default {
       const userIds = new Set([...memberships.map(x => x.userId), ...racePasses.map(x => x.userId)]);
       let sent = 0;
       let failed = 0;
+      const failedUsers = [];
 
       for (const userId of userIds) {
         try {
@@ -231,18 +232,43 @@ export default {
             improvement: '',
           });
           await user.send({
-            embeds: [embed('🏁 ' + race.name + ' — Race Feedback', 'Thank you for supporting Ace\'s Apex!\n\nWe\'d love to know how your race weekend experience was.')],
+            embeds: [embed('🏁 ' + race.name + ' — Race Feedback', 'Thank you for supporting Ace\\'s Apex!\\n\\nWe\\'d love to know how your race weekend experience was.')],
             components: startRow(),
           });
           sent++;
         } catch (error) {
           failed++;
+          try {
+            const failedUser = await interaction.client.users.fetch(userId);
+            failedUsers.push('• ' + failedUser.username + ' (' + userId + ')');
+          } catch {
+            failedUsers.push('• <@' + userId + '> (' + userId + ')');
+          }
           console.error('Feedback DM failed for ' + userId + ':', error?.message || error);
         }
       }
 
       const channel = await interaction.client.channels.fetch(config.channels.dmLogs).catch(() => null);
-      if (channel) await channel.send('📨 **Feedback broadcast completed** for **' + race.name + '** — ' + sent + ' sent, ' + failed + ' failed.');
+      if (channel) {
+        await channel.send(
+          '📨 **Feedback Broadcast Completed**\\n' +
+          '🏁 **Race:** ' + race.name + '\\n' +
+          '📨 **DMs sent:** ' + sent + '\\n' +
+          '❌ **DMs failed:** ' + failed + '\\n' +
+          '👥 **Total recipients:** ' + userIds.size
+        );
+
+        if (failedUsers.length) {
+          let list = failedUsers.join('\\n');
+          while (list.length > 1900) {
+            const splitAt = list.lastIndexOf('\\n', 1900);
+            const chunk = list.slice(0, splitAt > 0 ? splitAt : 1900);
+            await channel.send('❌ **Failed to DM:**\\n' + chunk);
+            list = list.slice(splitAt > 0 ? splitAt + 1 : 1900);
+          }
+          if (list) await channel.send('❌ **Failed to DM:**\\n' + list);
+        }
+      }
     } finally {
       feedbackBroadcastRunning = false;
     }
