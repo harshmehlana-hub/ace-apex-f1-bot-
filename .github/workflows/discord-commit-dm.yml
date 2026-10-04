@@ -1,1 +1,61 @@
-name: Discord commit notification\n\non:\n  push:\n    branches:\n      - fixed-v4-migration\n\njobs:\n  notify:\n    runs-on: ubuntu-latest\n    steps:\n      - name: Send commit notification to Discord DM\n        env:\n          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}\n          COMMIT_SHA: ${{ github.sha }}\n          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}\n          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}\n          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}\n        run: |\n          set -euo pipefail\n\n          if [ -z "${DISCORD_BOT_TOKEN:-}" ]; then\n            echo "Missing DISCORD_BOT_TOKEN GitHub secret."\n            exit 1\n          fi\n\n          payload=$(python - <<'PY'\n          import json\n          print(json.dumps({"recipient_id": "1476246684752150528"}))\n          PY\n          )\n\n          dm=$(curl -fsS -X POST \\n            -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \\n            -H "Content-Type: application/json" \\n            https://discord.com/api/v10/users/@me/channels \\n            -d "$payload")\n\n          channel_id=$(python -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "$dm")\n\n          message_payload=$(python - <<'PY'\n          import json, os\n          message = os.environ["COMMIT_MESSAGE"].strip()\n          if len(message) > 1500:\n              message = message[:1497] + "..."\n          text = (\n              "🚀 **Ace's Apex production update**\n\n"\n              f"**Commit:** \\`{os.environ['COMMIT_SHA'][:7]}\\`\n"\n              f"**Message:** {message}\n"\n              f"**Author:** {os.environ['COMMIT_AUTHOR']}\n"\n              f"**Commit:** {os.environ['COMMIT_URL']}"\n          )\n          print(json.dumps({"content": text}))\n          PY\n          )\n\n          curl -fsS -X POST \\n            -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \\n            -H "Content-Type: application/json" \\n            "https://discord.com/api/v10/channels/${channel_id}/messages" \\n            -d "$message_payload"\n
+name: Discord commit notification
+
+on:
+  push:
+    branches:
+      - fixed-v4-migration
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send commit notification to Discord DM
+        env:
+          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DISCORD_BOT_TOKEN:-}" ]; then
+            echo "Missing DISCORD_BOT_TOKEN GitHub secret."
+            exit 1
+          fi
+
+          payload=$(python - <<'PY'
+          import json
+          print(json.dumps({"recipient_id": "1476246684752150528"}))
+          PY
+          )
+
+          dm=$(curl -fsS -X POST \
+            -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            https://discord.com/api/v10/users/@me/channels \
+            -d "$payload")
+
+          channel_id=$(python -c 'import json,sys; print(json.load(sys.stdin)["id"])' <<< "$dm")
+
+          message_payload=$(python - <<'PY'
+          import json, os
+          message = os.environ["COMMIT_MESSAGE"].strip()
+          if len(message) > 1500:
+              message = message[:1497] + "..."
+          text = (
+              "🚀 **Ace's Apex production update**\n\n"
+              f"**Commit:** \\`{os.environ['COMMIT_SHA'][:7]}\\`\n"
+              f"**Message:** {message}\n"
+              f"**Author:** {os.environ['COMMIT_AUTHOR']}\n"
+              f"**Commit:** {os.environ['COMMIT_URL']}"
+          )
+          print(json.dumps({"content": text}))
+          PY
+          )
+
+          curl -fsS -X POST \
+            -H "Authorization: Bot ${DISCORD_BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            "https://discord.com/api/v10/channels/${channel_id}/messages" \
+            -d "$message_payload"
