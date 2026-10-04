@@ -27,6 +27,7 @@ import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
 import announcementCommand from './commands/announcement.js';
 import feedbackCommand from './commands/feedback.js';
+import { feedbackStatsCommand } from './services/feedbackService.js';
 
 const commands = [
   predictCommand.data.toJSON(),
@@ -54,6 +55,7 @@ dmCommand.data.toJSON(),
   purchasemembershipCommand.data.toJSON(),
   announcementCommand.data.toJSON(),
   feedbackCommand.data.toJSON(),
+  feedbackStatsCommand.data.toJSON(),
 ];
 
 const rest = new REST().setToken(config.token);
