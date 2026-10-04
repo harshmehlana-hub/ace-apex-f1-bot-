@@ -105,7 +105,6 @@ export async function recalculateRaceScores(race, oldResult, newResult, options 
     }, session);
   }
 
-  await rebuildAllSeasonStandings(race.season, { session });
   return predictions.map(prediction => ({
     userId: prediction.userId,
     pointsAwarded: prediction.pointsAwarded,
