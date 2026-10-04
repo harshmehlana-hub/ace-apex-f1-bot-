@@ -1,4 +1,4 @@
-import { EmbedBuilder, Routes } from 'discord.js';
+import { Routes } from 'discord.js';
 import { Membership } from '../database/models/Membership.js';
 import { config } from '../config.js';
 import { logDM } from '../utils/dmLogger.js';
@@ -56,36 +56,7 @@ export async function grantMembership({ client, guild, user, type, grantedBy, so
     console.error('Membership activation DM failed:', error);
   }
 
-  await logMembershipGrant(client, { guild, user, type, expiry, grantedBy, source, paymentRequest });
   return { membership, expiry, membershipName: details.name };
-}
-
-async function logMembershipGrant(client, { guild, user, type, expiry, grantedBy, source, paymentRequest }) {
-  try {
-    const channel = await client.channels.fetch(config.channels.logs);
-    if (!channel) return;
-    const embed = new EmbedBuilder()
-      .setColor(0x2ecc71)
-      .setTitle('🎟️ Membership Granted')
-      .setTimestamp()
-      .addFields(
-        { name: '👤 Member', value: user.tag + '\n`' + user.id + '`', inline: true },
-        { name: '🎟️ Membership', value: MEMBERSHIP_DETAILS[type].name, inline: true },
-        { name: '⏰ Expires', value: '<t:' + Math.floor(expiry.getTime() / 1000) + ':F>', inline: true },
-        { name: '🔧 Source', value: source, inline: true },
-        { name: '👮 Granted by', value: grantedBy.tag + '\n`' + grantedBy.id + '`', inline: true },
-      );
-    if (paymentRequest) {
-      embed.addFields(
-        { name: '💳 Payment', value: paymentRequest.currency + ' ' + paymentRequest.amount, inline: true },
-        { name: '🧾 Payer name', value: paymentRequest.payerName, inline: true },
-        { name: '🆔 Request ID', value: '`' + paymentRequest.requestId + '`', inline: true },
-      );
-    }
-    await channel.send({ embeds: [embed] });
-  } catch (error) {
-    console.error('Failed to log membership grant:', error);
-  }
 }
 
 export { MEMBERSHIP_DETAILS };
