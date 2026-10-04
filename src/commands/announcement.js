@@ -2,14 +2,14 @@ import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.j
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 
-function buildRaceWeekendAnnouncement(raceName, membershipCommandMention) {
+function buildRaceWeekendAnnouncement(raceName) {
   return `@everyone
 Its race weekend again, ways to watch F1 in our server:
 Free to everyone (may lag/get full)
 Race Pass for ${raceName} (30 INR / 1.5 USD)
 Monthly Supporters membership (50 INR / 3 USD)
 Yearly Supporters membership (450 INR / 28 USD)
-Use ${membershipCommandMention} to get access to Race Pass or Membership.
+Use \`/purchasemembership\` to get access to Race Pass or Membership.
 
 *NOTE : Race Pass and Membership are for those who want to support the server and watch the race sessions peacefully out of the chaos without lags, else free streams for race and quali will be held no need to worry.*`;
 }
@@ -50,13 +50,7 @@ export default {
     }
 
     try {
-      const commands = await interaction.guild.commands.fetch();
-      const membershipCommand = commands.find(command => command.name === 'purchasemembership');
-      const membershipCommandMention = membershipCommand
-        ? `</purchasemembership:${membershipCommand.id}>`
-        : '/purchasemembership';
-
-      await channel.send({ content: buildRaceWeekendAnnouncement(raceName, membershipCommandMention) });
+      await channel.send({ content: buildRaceWeekendAnnouncement(raceName) });
       return interaction.reply({
         content: `✅ Race-weekend announcement for **${raceName}** sent to <#${channel.id}>.`,
         ephemeral: true,
