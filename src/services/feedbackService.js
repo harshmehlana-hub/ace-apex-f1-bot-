@@ -188,7 +188,7 @@ export default {
     if (feedbackBroadcastRunning) return interaction.reply({ content: '⚠️ A feedback DM broadcast is already running. Please wait for it to finish.', ephemeral: true });
 
     const raceName = interaction.options.getString('race');
-    const race = await Race.findOne({ name: raceName }).lean();
+    const race = await Race.findOne({ name: raceName, season: config.season }).lean();
     if (!race) return interaction.reply({ content: '❌ Race not found. Please use the exact race name.', ephemeral: true });
 
     feedbackBroadcastRunning = true;
