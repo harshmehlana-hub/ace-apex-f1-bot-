@@ -113,6 +113,15 @@ export async function handleFeedbackInteraction(interaction) {
   if (id === ids.start) {
     const state = sessions.get(interaction.user.id);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
+    const existing = await FeedbackResponse.exists({
+      guildId: state.guildId,
+      raceKey: state.raceKey,
+      userId: interaction.user.id,
+    });
+    if (existing) {
+      sessions.delete(interaction.user.id);
+      return interaction.reply({ content: '✅ You have already submitted feedback for this race. Thank you! ❤️', ephemeral: true });
+    }
     return interaction.update({
       embeds: [embed('Question 1', '🏁 **Did you attend the ' + state.raceName + ' race stream today?**')],
       components: attendanceRow(),
