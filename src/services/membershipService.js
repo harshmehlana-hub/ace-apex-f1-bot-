@@ -90,7 +90,7 @@ export async function grantMembership({ client, guild, user, type, grantedBy, so
       'Your membership is now active on the server.\n\n' +
       '**Type:** ' + details.name + '\n' +
       '**Valid till:** <t:' + Math.floor(expiry.getTime() / 1000) + ':F>\n\n' +
-      'Thank you for supporting **Ace\\'s Apex**! We truly appreciate your support. 🥳❤️'
+      "Thank you for supporting **Ace's Apex**! We truly appreciate your support. 🥳❤️"
     );
     await logDM(client, 'Membership Activated', grantedBy, user, 'Membership Type: ' + details.name);
   } catch (error) {
