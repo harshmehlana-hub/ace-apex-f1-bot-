@@ -4,6 +4,7 @@ const raceSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   raceStartTime: { type: Date, required: true, index: true },
   season: { type: String, required: true, index: true },
+  racePassKey: { type: String, default: null, index: true },
   predictionOpenTime: { type: Date, required: true },
   predictionCloseTime: { type: Date, required: true },
   status: {
