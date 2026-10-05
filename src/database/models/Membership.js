@@ -20,8 +20,6 @@ const membershipSchema = new mongoose.Schema({
   paymentRequestId: {
     type: String,
     default: null,
-    sparse: true,
-    unique: true,
   },
 
   type: {
@@ -50,6 +48,11 @@ const membershipSchema = new mongoose.Schema({
     default: false,
   },
 }, { timestamps: true });
+
+membershipSchema.index(
+  { paymentRequestId: 1 },
+  { unique: true, partialFilterExpression: { paymentRequestId: { $type: 'string' } } }
+);
 
 export const Membership = mongoose.model(
   'Membership',
