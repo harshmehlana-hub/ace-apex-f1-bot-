@@ -270,7 +270,7 @@ async function verifyPayment(interaction, client, requestId) {
   await interaction.deferUpdate();
   const request = await PaymentVerification.findOneAndUpdate(
     { requestId, status: 'pending' },
-    { $set: { status: 'processing', verifiedBy: interaction.user.id } },
+    { $set: { status: 'processing', processingAt: new Date(), verifiedBy: interaction.user.id } },
     { new: true }
   );
   if (!request) return interaction.followUp({ content: '⚠️ This request has already been processed.', ephemeral: true });
@@ -293,7 +293,7 @@ async function verifyPayment(interaction, client, requestId) {
   } catch (error) {
     await PaymentVerification.updateOne(
       { _id: request._id, status: 'processing' },
-      { $set: { status: 'pending', verifiedBy: null } }
+      { $set: { status: 'pending', processingAt: null, verifiedBy: null } }
     );
     console.error('Failed to verify membership payment:', error);
     await interaction.followUp({
