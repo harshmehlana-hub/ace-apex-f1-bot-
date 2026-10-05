@@ -162,7 +162,7 @@ async function header(title, aliases) {
 }
 
 const RACE_ALIASES = {
-  'bahrain-malaysia': ['bahrain malaysia', 'bahrain'],
+  'bahrain-malaysia': ['singapore', 'bahrain malaysia', 'bahrain'],
   singapore: ['singapore'],
   'united-states': ['us', 'united states', 'usa', 'united states gp', 'united states grand prix'],
   mexico: ['mexico', 'mexico gp', 'mexican gp'],
