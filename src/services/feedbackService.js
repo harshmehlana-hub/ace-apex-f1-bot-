@@ -35,23 +35,23 @@ function embed(title, description) {
   return new EmbedBuilder().setTitle(title).setDescription(description).setColor(0x3498db);
 }
 
-function startRow() {
+function startRow(raceKey) {
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(ids.start).setLabel('📝 Give Feedback').setStyle(ButtonStyle.Primary)
+    new ButtonBuilder().setCustomId(ids.start + ':' + raceKey).setLabel('📝 Give Feedback').setStyle(ButtonStyle.Primary)
   )];
 }
 
-function attendanceRow() {
+function attendanceRow(raceKey) {
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(ids.attendance + ':yes').setLabel('✅ Yes').setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId(ids.attendance + ':no').setLabel('❌ No').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(ids.attendance + ':' + raceKey + ':yes').setLabel('✅ Yes').setStyle(ButtonStyle.Success),
+    new ButtonBuilder().setCustomId(ids.attendance + ':' + raceKey + ':no').setLabel('❌ No').setStyle(ButtonStyle.Secondary)
   )];
 }
 
-function ratingRow() {
+function ratingRow(raceKey) {
   return [new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(ids.rating)
+      .setCustomId(ids.rating + ':' + raceKey)
       .setPlaceholder('Select your experience rating')
       .addOptions(
         { label: '1 — Very Poor', value: '1', emoji: '⭐' },
@@ -63,10 +63,10 @@ function ratingRow() {
   )];
 }
 
-function commentRow() {
+function commentRow(raceKey) {
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(ids.comment).setLabel('✍️ Give Feedback').setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId(ids.skip).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId(ids.comment + ':' + raceKey).setLabel('✍️ Give Feedback').setStyle(ButtonStyle.Primary),
+    new ButtonBuilder().setCustomId(ids.skip + ':' + raceKey).setLabel('⏭️ Skip').setStyle(ButtonStyle.Secondary)
   )];
 }
 
@@ -117,7 +117,7 @@ export async function handleFeedbackInteraction(interaction) {
   if (!(interaction.isButton() || interaction.isStringSelectMenu())) return false;
   const id = interaction.customId || '';
 
-  if (id === ids.start) {
+  if (id.startsWith(ids.start + ':')) {
     const raceKey = interaction.customId.split(':')[2];
     const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
@@ -132,7 +132,7 @@ export async function handleFeedbackInteraction(interaction) {
     }
     return interaction.update({
       embeds: [embed('Question 1', '🏁 **Did you attend the ' + state.raceName + ' race stream today?**')],
-      components: attendanceRow(),
+      components: attendanceRow(raceKey),
     });
   }
 
@@ -148,11 +148,11 @@ export async function handleFeedbackInteraction(interaction) {
     }
     return interaction.update({
       embeds: [embed('Question 2', '⭐ **How was your experience?**')],
-      components: ratingRow(),
+      components: ratingRow(raceKey),
     });
   }
 
-  if (interaction.isStringSelectMenu() && id === ids.rating) {
+  if (interaction.isStringSelectMenu() && id.startsWith(ids.rating + ':')) {
     const raceKey = interaction.customId.split(':')[2];
     const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
@@ -163,18 +163,18 @@ export async function handleFeedbackInteraction(interaction) {
     });
   }
 
-  if (id === ids.skip) {
+  if (id.startsWith(ids.skip + ':')) {
     const raceKey = interaction.customId.split(':')[2];
     const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     return submit(interaction, state);
   }
 
-  if (id === ids.comment) {
+  if (id.startsWith(ids.comment + ':')) {
     const raceKey = interaction.customId.split(':')[2];
     const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
-    const modal = new ModalBuilder().setCustomId('feedback:modal').setTitle('Race Feedback');
+    const modal = new ModalBuilder().setCustomId('feedback:modal:' + raceKey).setTitle('Race Feedback');
     modal.addComponents(new ActionRowBuilder().addComponents(
       new TextInputBuilder()
         .setCustomId('improvement')
