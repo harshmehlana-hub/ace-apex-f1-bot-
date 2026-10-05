@@ -12,6 +12,6 @@ const feedbackSessionSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 feedbackSessionSchema.index({ guildId: 1, raceKey: 1, userId: 1 }, { unique: true });
-feedbackSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 86400 });
+feedbackSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 604800 });
 
 export const FeedbackSession = mongoose.model('FeedbackSession', feedbackSessionSchema);
