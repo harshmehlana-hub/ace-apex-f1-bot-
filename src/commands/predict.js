@@ -149,6 +149,20 @@ export default {
 
       const p3Driver = p3Interaction.values[0];
 
+      const finalCheck = await Race.findOne({
+        _id: race._id,
+        season: activeSeason,
+        status: 'open',
+        predictionOpenTime: { $lte: new Date() },
+        predictionCloseTime: { $gt: new Date() },
+      });
+      if (!finalCheck) {
+        return p3Interaction.update({
+          content: '❌ Predictions for this race have closed. Your prediction was not submitted.',
+          components: [],
+        });
+      }
+
       const validation = validatePodiumSelection(
         p1Driver,
         p2Driver,
