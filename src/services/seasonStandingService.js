@@ -83,17 +83,24 @@ export async function rebuildAllSeasonStandings(season, options = {}) {
   // Rebuild the entire season from a small, fixed number of queries and one
   // bulk write. This avoids the old N-users x many-queries pattern that became
   // very slow on large Discord servers.
-  const [standings, races, qualifyingSessions, predictions, qualifyingPredictions, transactions] = await Promise.all([
+  const [standings, races, qualifyingSessions, transactions] = await Promise.all([
     SeasonStanding.find({ season }).select('userId').session(session).lean(),
     Race.find({ season, status: 'completed' }).select('_id').session(session).lean(),
     Qualifying.find({ season, status: 'completed' }).select('_id').session(session).lean(),
-    Prediction.find({ season }).select('userId raceId p1Driver p2Driver p3Driver').session(session).lean(),
-    QualifyingPrediction.find({ season }).select('userId qualifyingId predictedDriver').session(session).lean(),
     PointTransaction.find({ season }).select('userId amount sourceType createdAt').sort({ createdAt: 1, _id: 1 }).session(session).lean(),
   ]);
 
   const raceIds = races.map(r => r._id);
   const qualifyingIds = qualifyingSessions.map(q => q._id);
+
+  const [predictions, qualifyingPredictions] = await Promise.all([
+    raceIds.length
+      ? Prediction.find({ season, raceId: { $in: raceIds } }).select('userId raceId p1Driver p2Driver p3Driver').session(session).lean()
+      : [],
+    qualifyingIds.length
+      ? QualifyingPrediction.find({ season, qualifyingId: { $in: qualifyingIds } }).select('userId qualifyingId predictedDriver').session(session).lean()
+      : [],
+  ]);
 
   const [raceResults, qualifyingResults] = await Promise.all([
     raceIds.length ? Result.find({ raceId: { $in: raceIds } }).select('raceId p1Driver p2Driver p3Driver').session(session).lean() : [],
