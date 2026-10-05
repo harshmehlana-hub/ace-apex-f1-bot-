@@ -3,7 +3,6 @@ import { config } from '../config.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { QualifyingPrediction } from '../database/models/QualifyingPrediction.js';
 import { PointTransaction } from '../database/models/PointTransaction.js';
-import { rebuildAllSeasonStandings } from './seasonStandingService.js';
 
 export function calculateScore(prediction, result) {
   let correctPositions = 0;
@@ -116,27 +115,56 @@ export async function processQualifyingResults(qualifying, result, options = {})
   const session = options.session || null;
   const predictions = await QualifyingPrediction.find({ qualifyingId: qualifying._id }).session(session);
 
-  for (const prediction of predictions) {
-    const points = calculateQualifyingScore(prediction, result);
-    prediction.pointsAwarded = points;
-    await prediction.save({ session });
-    await upsertTransaction({
-      userId: prediction.userId,
-      season: prediction.season,
-      sourceType: 'qualifying_result',
-      sourceId: String(qualifying._id),
-      amount: points,
-      reason: `${qualifying.name} qualifying result`,
-    }, session);
+  const scored = predictions.map(prediction => ({
+    prediction,
+    points: calculateQualifyingScore(prediction, result),
+  }));
+
+  if (scored.length) {
+    await QualifyingPrediction.bulkWrite(
+      scored.map(({ prediction, points }) => ({
+        updateOne: {
+          filter: { _id: prediction._id },
+          update: { $set: { pointsAwarded: points } },
+        },
+      })),
+      { session }
+    );
+
+    await PointTransaction.bulkWrite(
+      scored.map(({ prediction, points }) => ({
+        updateOne: {
+          filter: {
+            userId: prediction.userId,
+            season: prediction.season,
+            sourceType: 'qualifying_result',
+            sourceId: String(qualifying._id),
+          },
+          update: {
+            $set: {
+              amount: points,
+              reason: `${qualifying.name} qualifying result`,
+              createdBy: null,
+            },
+          },
+          $setOnInsert: {
+            userId: prediction.userId,
+            season: prediction.season,
+            sourceType: 'qualifying_result',
+            sourceId: String(qualifying._id),
+          },
+          upsert: true,
+        },
+      })),
+      { session }
+    );
   }
 
-  await rebuildAllSeasonStandings(qualifying.season, { session });
-  return predictions.map(prediction => ({
+  return scored.map(({ prediction, points }) => ({
     userId: prediction.userId,
-    pointsAwarded: prediction.pointsAwarded,
+    pointsAwarded: points,
   }));
 }
-
 export async function recalculateQualifyingScores(qualifying, result, options = {}) {
   return processQualifyingResults(qualifying, result, options);
 }
