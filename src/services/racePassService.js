@@ -78,10 +78,10 @@ export async function grantRacePass({ client, guild, user, raceKey, paymentReque
 }
 
 
-export async function cancelRacePassesForRace(client, guildId, raceName) {
+export async function cancelRacePassesForRace(client, guildId, raceName, raceKey = null) {
   const passes = await RacePass.find({
     guildId,
-    raceName,
+    $or: raceKey ? [{ raceKey }, { raceName }] : [{ raceName }],
     status: { $in: ['scheduled', 'active'] },
   }).limit(200);
 
