@@ -10,10 +10,33 @@ import { PointTransaction } from '../database/models/PointTransaction.js';
 import { getCurrentSeason } from './seasonService.js';
 import { calculateScore, calculateQualifyingScore } from './scoringService.js';
 import { SchemaMigration } from '../database/models/SchemaMigration.js';
+import { Membership } from '../database/models/Membership.js';
 
 const migrationName = 'v4-fast-current-season-score-reconciliation';
 
+
+async function runMembershipGuildSafetyMigration() {
+  const name = 'v5-membership-guild-safe-index';
+  if (await SchemaMigration.exists({ name })) return;
+
+  try {
+    await Membership.collection.dropIndex('userId_1');
+  } catch (error) {
+    if (error?.codeName !== 'IndexNotFound' && error?.code !== 27) throw error;
+  }
+
+  await Membership.collection.createIndex(
+    { guildId: 1, userId: 1 },
+    { unique: true, name: 'guildId_1_userId_1' }
+  );
+
+  await SchemaMigration.create({ name });
+  console.log('[Migration] Membership records are now guild-safe.');
+}
+
 export async function runDataMigrations() {
+  await runMembershipGuildSafetyMigration();
+
   if (await SchemaMigration.exists({ name: migrationName })) {
     console.log('[Migration] Already completed:', migrationName);
     return;
