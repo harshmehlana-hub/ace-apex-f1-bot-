@@ -6,6 +6,7 @@ import { getDriverSelectOptions } from '../utils/drivers.js';
 import { createQualifyingResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { rebuildAllSeasonStandings } from '../services/seasonStandingService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('qualifyingresult').setDescription('Enter qualifying results (Admin only)').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -24,6 +25,7 @@ export default {
       await qI.update({ content: `🏁 **${qualifying.name}**\n\n🏆 Select the official Pole Position driver:`, components: [poleMenu] });
       const poleI = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
       const poleDriver = poleI.values[0];
+      await poleI.deferUpdate();
 
       const { predictions, correctPredictions } = await runInTransaction(async session => {
         const docs = await QualifyingResult.create([{ qualifyingId: qualifying._id, poleDriver, enteredBy: interaction.user.id }], { session });
@@ -43,11 +45,13 @@ export default {
         return { predictions: scored, correctPredictions: scored.filter(s => s.pointsAwarded === config.qualifyingScoring.correct).length };
       });
 
+      await rebuildAllSeasonStandings(qualifying.season);
+
       try {
         const resultsChannel = await client.channels.fetch(config.channels.results);
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏁 Qualifying Results are OUT!', embeds: [createQualifyingResultsEmbed(qualifying, { poleDriver }, correctPredictions, predictions.length)] });
       } catch (error) { console.error('Failed to publish qualifying results:', error); }
-      await poleI.update({ content: `✅ Results processed successfully!\n\n🏁 ${qualifying.name}\n🏆 Pole Position: ${poleDriver}\n\n🎯 Correct Predictions: ${correctPredictions}\n📊 Total Predictions: ${predictions.length}`, components: [] });
+      await poleI.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${qualifying.name}\n🏆 Pole Position: ${poleDriver}\n\n🎯 Correct Predictions: ${correctPredictions}\n📊 Total Predictions: ${predictions.length}`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Selection timed out.', components: [] });
