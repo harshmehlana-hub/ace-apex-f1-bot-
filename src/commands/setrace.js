@@ -35,9 +35,18 @@ export default {
     const predictionCloseTime = new Date(calendarRace.raceStartAt.getTime() - config.timing.closeBefore);
     const now = new Date();
 
+    if (now >= calendarRace.raceStartAt) {
+      return interaction.reply({
+        content:
+          `❌ **${calendarRace.name} has already started/passed.**\\n\\n` +
+          `Race start: <t:${Math.floor(calendarRace.raceStartAt.getTime() / 1000)}:F>\\n` +
+          'Past races cannot be newly activated with \`/setrace\`. Historical races remain available in the database.',
+        ephemeral: true,
+      });
+    }
+
     let calculatedStatus = 'upcoming';
     if (now >= predictionOpenTime && now < predictionCloseTime) calculatedStatus = 'open';
-    else if (now >= predictionCloseTime) calculatedStatus = 'closed';
 
     let race = await Race.findOne({ season, calendarKey });
     if (!race) race = await Race.findOne({ season, name: calendarRace.name });
@@ -54,7 +63,7 @@ export default {
 
       return interaction.reply({
         content:
-          '✅ **' + calendarRace.name + ' is now linked to the 2026 season calendar.**\n\n' +
+          '✅ **' + calendarRace.name + ' is now linked to the ' + season + ' season calendar.**\n\n' +
           '📅 Race Start: <t:' + Math.floor(calendarRace.raceStartAt.getTime() / 1000) + ':F>\n' +
           '🟢 Predictions Open: <t:' + Math.floor(predictionOpenTime.getTime() / 1000) + ':F>\n' +
           '🔴 Predictions Close: <t:' + Math.floor(predictionCloseTime.getTime() / 1000) + ':F>\n' +
