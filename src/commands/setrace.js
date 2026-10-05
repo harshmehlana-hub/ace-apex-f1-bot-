@@ -1,112 +1,89 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { Race } from '../database/models/Race.js';
 import { config } from '../config.js';
-import { isAdmin, parseISTDateTime } from '../utils/validators.js';
+import { isAdmin } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
-import { getRacePassesForSeason, getRacePass } from '../config/racePasses2026.js';
+import { getCalendarRace, getCalendarChoices } from '../config/seasonCalendar2026.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('setrace')
-    .setDescription('Create a new race for predictions (Admin only)')
+    .setDescription('Select and activate a race from the season calendar (Admin only)')
     .addStringOption(option =>
       option
-        .setName('name')
-        .setDescription('Race name (e.g., "Monaco Grand Prix")')
+        .setName('race')
+        .setDescription('Select the Grand Prix')
         .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('date')
-        .setDescription('Race date (DD-MM-YYYY)')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('time')
-        .setDescription('Race start time in IST (HH:MM)')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('racepass_key')
-        .setDescription('Optional Race Pass calendar key for this race')
-        .setRequired(false)
-        .addChoices(...getRacePassesForSeason(new Date().getUTCFullYear()).map(r => ({ name: r.name, value: r.key })))
+        .addChoices(...getCalendarChoices(new Date().getUTCFullYear()))
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-  
+
   async execute(interaction) {
-    // Check admin permissions
     if (!isAdmin(interaction.member, config.roles.admin)) {
-      return interaction.reply({
-        content: '❌ You do not have permission to use this command.',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     }
-    
-    const name = interaction.options.getString('name').trim();
-    const dateStr = interaction.options.getString('date');
-    const timeStr = interaction.options.getString('time');
-    const racePassKey = interaction.options.getString('racepass_key');
-    const raceStartTime = parseISTDateTime(dateStr, timeStr);
+
+    const calendarKey = interaction.options.getString('race');
     const season = await getCurrentSeason();
+    const calendarRace = getCalendarRace(calendarKey, season);
 
-    if (!raceStartTime) {
-      return interaction.reply({
-        content: '❌ Invalid date/time. Use DD-MM-YYYY and HH:MM in IST, and enter a real calendar date.',
-        ephemeral: true,
-      });
+    if (!calendarRace) {
+      return interaction.reply({ content: '❌ That race is not configured in the active season calendar.', ephemeral: true });
     }
 
-    const linkedRacePass = racePassKey ? getRacePass(racePassKey, season) : null;
-    if (racePassKey && !linkedRacePass) {
-      return interaction.reply({ content: '❌ That Race Pass calendar entry is not configured for the active season.', ephemeral: true });
-    }
-    if (linkedRacePass && Math.abs(raceStartTime.getTime() - linkedRacePass.raceStartAt.getTime()) > 5 * 60 * 1000) {
-      return interaction.reply({ content: '❌ The race time does not match the linked Race Pass calendar. Please use the official Race Pass time.', ephemeral: true });
-    }
-
-    const existingRace = await Race.findOne({ season, name });
-    if (existingRace) {
-      return interaction.reply({
-        content: `❌ A race named "${name}" already exists in season ${season}.`,
-        ephemeral: true,
-      });
-    }
-
-    // Calculate prediction window times
-    const predictionOpenTime = new Date(raceStartTime.getTime() - config.timing.openBefore);
-    const predictionCloseTime = new Date(raceStartTime.getTime() - config.timing.closeBefore);
-    
-    // Determine initial status
+    const predictionOpenTime = new Date(calendarRace.raceStartAt.getTime() - config.timing.openBefore);
+    const predictionCloseTime = new Date(calendarRace.raceStartAt.getTime() - config.timing.closeBefore);
     const now = new Date();
-    let status = 'upcoming';
-    if (now >= predictionOpenTime && now < predictionCloseTime) {
-      status = 'open';
-    } else if (now >= predictionCloseTime) {
-      status = 'closed';
+
+    let calculatedStatus = 'upcoming';
+    if (now >= predictionOpenTime && now < predictionCloseTime) calculatedStatus = 'open';
+    else if (now >= predictionCloseTime) calculatedStatus = 'closed';
+
+    let race = await Race.findOne({ season, calendarKey });
+    if (!race) race = await Race.findOne({ season, name: calendarRace.name });
+
+    if (race) {
+      race.name = calendarRace.name;
+      race.calendarKey = calendarRace.key;
+      race.racePassKey = calendarRace.racePassKey;
+      race.raceStartTime = calendarRace.raceStartAt;
+      race.predictionOpenTime = predictionOpenTime;
+      race.predictionCloseTime = predictionCloseTime;
+      if (!['completed', 'cancelled'].includes(race.status)) race.status = calculatedStatus;
+      await race.save();
+
+      return interaction.reply({
+        content:
+          '✅ **' + calendarRace.name + ' is now linked to the 2026 season calendar.**\n\n' +
+          '📅 Race Start: <t:' + Math.floor(calendarRace.raceStartAt.getTime() / 1000) + ':F>\n' +
+          '🟢 Predictions Open: <t:' + Math.floor(predictionOpenTime.getTime() / 1000) + ':F>\n' +
+          '🔴 Predictions Close: <t:' + Math.floor(predictionCloseTime.getTime() / 1000) + ':F>\n' +
+          '📊 Status: ' + race.status.charAt(0).toUpperCase() + race.status.slice(1) + '\n\n' +
+          '🔒 This calendar race is protected from duplicate creation.',
+        ephemeral: true,
+      });
     }
-    
-    const race = new Race({
-      name,
+
+    race = await Race.create({
+      name: calendarRace.name,
+      calendarKey: calendarRace.key,
       season,
-      racePassKey: racePassKey || null,
-      raceStartTime,
+      racePassKey: calendarRace.racePassKey,
+      raceStartTime: calendarRace.raceStartAt,
       predictionOpenTime,
       predictionCloseTime,
-      status,
+      status: calculatedStatus,
     });
-    
-    await race.save();
-    
-    await interaction.reply({
-      content: `✅ **Race created successfully!**\n\n` +
-        `🏎️ **${name}**\n` +
-        `📅 Race Start: <t:${Math.floor(raceStartTime.getTime() / 1000)}:F>\n` +
-        `🟢 Predictions Open: <t:${Math.floor(predictionOpenTime.getTime() / 1000)}:F>\n` +
-        `🔴 Predictions Close: <t:${Math.floor(predictionCloseTime.getTime() / 1000)}:F>\n` +
-        `📊 Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+
+    return interaction.reply({
+      content:
+        '✅ **Race activated successfully!**\n\n' +
+        '🏎️ **' + calendarRace.name + '**\n' +
+        '📅 Race Start: <t:' + Math.floor(calendarRace.raceStartAt.getTime() / 1000) + ':F>\n' +
+        '🟢 Predictions Open: <t:' + Math.floor(predictionOpenTime.getTime() / 1000) + ':F>\n' +
+        '🔴 Predictions Close: <t:' + Math.floor(predictionCloseTime.getTime() / 1000) + ':F>\n' +
+        '📊 Status: ' + calculatedStatus.charAt(0).toUpperCase() + calculatedStatus.slice(1) + '\n' +
+        '🔒 This calendar race is protected from duplicate creation.',
       ephemeral: true,
     });
   },

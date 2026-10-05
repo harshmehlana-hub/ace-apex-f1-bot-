@@ -2,7 +2,7 @@ import { auditAdminCommand } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from '../services/purchaseMembershipService.js';
-import { handleFeedbackInteraction, handleFeedbackModal, handleFeedbackStatsInteraction } from '../services/feedbackService.js';
+import { handleFeedbackInteraction, handleFeedbackModal, handleFeedbackStatsInteraction, handleFeedbackAdminInteraction } from '../services/feedbackService.js';
 
 export default {
   name: 'interactionCreate',
@@ -12,6 +12,9 @@ export default {
         try {
           const handled = await handleFeedbackInteraction(interaction);
           if (handled) return;
+
+          const adminHandled = await handleFeedbackAdminInteraction(interaction);
+          if (adminHandled) return;
         } catch (error) {
           console.error('Error handling feedback interaction:', error);
           if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Something went wrong with the feedback form.', ephemeral: true }).catch(() => {});
@@ -44,7 +47,7 @@ export default {
     }
 
     if (interaction.isModalSubmit()) {
-      if (interaction.customId === 'feedback:modal') {
+      if (interaction.customId?.startsWith('feedback:modal:')) {
         try {
           await handleFeedbackModal(interaction);
         } catch (error) {
@@ -53,6 +56,7 @@ export default {
         }
         return;
       }
+
       const purchaseModal = interaction.customId?.startsWith(purchasePrefixes.PAID_PREFIX + ':');
       if (!purchaseModal) return;
 
@@ -68,15 +72,12 @@ export default {
       }
       return;
     }
-    // Handle slash commands.
-    // Discord requires an interaction to be acknowledged quickly. If a command
-    // takes longer than the normal response window, automatically defer it so
-    // the user never gets "The application did not respond".
+
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
 
       if (!command) {
-        console.error(`Command ${interaction.commandName} not found`);
+        console.error('Command ' + interaction.commandName + ' not found');
         return;
       }
 
@@ -110,9 +111,9 @@ export default {
         try {
           await interaction.deferReply();
           autoDeferred = true;
-          console.log(`[Interaction] Auto-deferred /${interaction.commandName}`);
+          console.log('[Interaction] Auto-deferred /' + interaction.commandName);
         } catch (error) {
-          console.error(`Failed to auto-defer /${interaction.commandName}:`, error);
+          console.error('Failed to auto-defer /' + interaction.commandName + ':', error);
         }
       }, 2000);
 
@@ -121,10 +122,10 @@ export default {
         if (adminAction) await auditAdminCommand(interaction, 'completed');
       } catch (error) {
         if (adminAction) await auditAdminCommand(interaction, 'failed', error);
-        console.error(`Error executing ${interaction.commandName}:`, error);
+        console.error('Error executing /' + interaction.commandName + ':', error);
 
         const errorMessage = {
-          content: '❌ An error occurred while executing this command.',
+          content: '❌ An error occurred while executing the command.',
           ephemeral: true,
         };
 
@@ -137,16 +138,6 @@ export default {
         if (responseTimer) clearTimeout(responseTimer);
         interaction.reply = originalReply;
       }
-    }
-
-    // Handle button interactions (for confirmation dialogs, etc.)
-    if (interaction.isButton()) {
-      // Button handling is done within individual commands
-    }
-
-    // Handle select menu interactions
-    if (interaction.isStringSelectMenu()) {
-      // Select menu handling is done within individual commands
     }
   },
 };

@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const raceSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
+  calendarKey: { type: String, default: null, index: true },
   raceStartTime: { type: Date, required: true, index: true },
   season: { type: String, required: true, index: true },
   racePassKey: { type: String, default: null, index: true },
@@ -23,6 +24,7 @@ const raceSchema = new mongoose.Schema({
 
 raceSchema.index({ season: 1, raceStartTime: 1 });
 raceSchema.index({ season: 1, name: 1 }, { unique: true });
+raceSchema.index({ season: 1, calendarKey: 1 }, { unique: true, sparse: true });
 
 raceSchema.virtual('isPredictionOpen').get(function () {
   const now = new Date();

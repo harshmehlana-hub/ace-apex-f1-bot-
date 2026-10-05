@@ -1,104 +1,87 @@
 import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { config } from '../config.js';
-import { isAdmin, parseISTDateTime } from '../utils/validators.js';
+import { isAdmin } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
+import { getCalendarRace, getCalendarChoices } from '../config/seasonCalendar2026.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('setqualifying')
-    .setDescription('Create a qualifying session (Admin only)')
+    .setDescription('Select and activate qualifying from the season calendar (Admin only)')
     .addStringOption(option =>
       option
-        .setName('name')
-        .setDescription('Qualifying name (e.g. Monaco Qualifying)')
+        .setName('race')
+        .setDescription('Select the Grand Prix')
         .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('date')
-        .setDescription('Date (DD-MM-YYYY)')
-        .setRequired(true)
-    )
-    .addStringOption(option =>
-      option
-        .setName('time')
-        .setDescription('Time in IST (HH:MM)')
-        .setRequired(true)
+        .addChoices(...getCalendarChoices(new Date().getUTCFullYear()))
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
     if (!isAdmin(interaction.member, config.roles.admin)) {
-      return interaction.reply({
-        content: '❌ You do not have permission to use this command.',
-        ephemeral: true,
-      });
+      return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     }
 
-    const name = interaction.options.getString('name').trim();
-    const dateStr = interaction.options.getString('date');
-    const timeStr = interaction.options.getString('time');
-    const sessionStartTime = parseISTDateTime(dateStr, timeStr);
-
-    if (!sessionStartTime) {
-      return interaction.reply({
-        content: '❌ Invalid date/time. Use DD-MM-YYYY and HH:MM in IST, and enter a real calendar date.',
-        ephemeral: true,
-      });
-    }
-
+    const calendarKey = interaction.options.getString('race');
     const season = await getCurrentSeason();
-    const existingSession = await Qualifying.findOne({ season, name });
-    if (existingSession) {
-      return interaction.reply({
-        content: `❌ A qualifying session named "${name}" already exists in season ${season}.`,
-        ephemeral: true,
-      });
+    const calendarRace = getCalendarRace(calendarKey, season);
+
+    if (!calendarRace) {
+      return interaction.reply({ content: '❌ That race is not configured in the active season calendar.', ephemeral: true });
     }
 
-    const predictionOpenTime = new Date(
-      sessionStartTime.getTime() - config.timing.openBefore
-    );
-
-    const predictionCloseTime = new Date(
-      sessionStartTime.getTime() - config.timing.closeBefore
-    );
-
-    let status = 'upcoming';
+    const predictionOpenTime = new Date(calendarRace.qualifyingStartAt.getTime() - config.timing.openBefore);
+    const predictionCloseTime = new Date(calendarRace.qualifyingStartAt.getTime() - config.timing.closeBefore);
     const now = new Date();
 
-    if (now >= predictionOpenTime && now < predictionCloseTime) {
-      status = 'open';
-    } else if (now >= predictionCloseTime) {
-      status = 'closed';
+    let calculatedStatus = 'upcoming';
+    if (now >= predictionOpenTime && now < predictionCloseTime) calculatedStatus = 'open';
+    else if (now >= predictionCloseTime) calculatedStatus = 'closed';
+
+    let qualifying = await Qualifying.findOne({ season, calendarKey });
+    if (!qualifying) qualifying = await Qualifying.findOne({ season, name: calendarRace.qualifyingName });
+
+    if (qualifying) {
+      qualifying.name = calendarRace.qualifyingName;
+      qualifying.calendarKey = calendarRace.key;
+      qualifying.sessionStartTime = calendarRace.qualifyingStartAt;
+      qualifying.predictionOpenTime = predictionOpenTime;
+      qualifying.predictionCloseTime = predictionCloseTime;
+      if (!['completed', 'cancelled'].includes(qualifying.status)) qualifying.status = calculatedStatus;
+      await qualifying.save();
+
+      return interaction.reply({
+        content:
+          '✅ **' + calendarRace.qualifyingName + ' is now linked to the 2026 season calendar.**\n\n' +
+          '📅 Session Start: <t:' + Math.floor(calendarRace.qualifyingStartAt.getTime() / 1000) + ':F>\n' +
+          '🟢 Predictions Open: <t:' + Math.floor(predictionOpenTime.getTime() / 1000) + ':F>\n' +
+          '🔴 Predictions Close: <t:' + Math.floor(predictionCloseTime.getTime() / 1000) + ':F>\n' +
+          '📊 Status: ' + qualifying.status.charAt(0).toUpperCase() + qualifying.status.slice(1) + '\n\n' +
+          '🔒 This calendar qualifying is protected from duplicate creation.',
+        ephemeral: true,
+      });
     }
 
-    const qualifying = new Qualifying({
-      name,
+    qualifying = await Qualifying.create({
+      name: calendarRace.qualifyingName,
+      calendarKey: calendarRace.key,
       season,
-      sessionStartTime,
+      sessionStartTime: calendarRace.qualifyingStartAt,
       predictionOpenTime,
       predictionCloseTime,
-      status,
+      status: calculatedStatus,
     });
 
-    await qualifying.save();
-
-    await interaction.reply({
+    return interaction.reply({
       content:
-        `✅ **Qualifying Session Created!**\n\n` +
-        `🏁 **${name}**\n` +
-        `📅 Session Start: <t:${Math.floor(
-          sessionStartTime.getTime() / 1000
-        )}:F>\n` +
-        `🟢 Predictions Open: <t:${Math.floor(
-          predictionOpenTime.getTime() / 1000
-        )}:F>\n` +
-        `🔴 Predictions Close: <t:${Math.floor(
-          predictionCloseTime.getTime() / 1000
-        )}:F>\n` +
-        `📊 Status: ${status.charAt(0).toUpperCase() + status.slice(1)}`,
+        '✅ **Qualifying activated successfully!**\n\n' +
+        '🏁 **' + calendarRace.qualifyingName + '**\n' +
+        '📅 Session Start: <t:' + Math.floor(calendarRace.qualifyingStartAt.getTime() / 1000) + ':F>\n' +
+        '🟢 Predictions Open: <t:' + Math.floor(predictionOpenTime.getTime() / 1000) + ':F>\n' +
+        '🔴 Predictions Close: <t:' + Math.floor(predictionCloseTime.getTime() / 1000) + ':F>\n' +
+        '📊 Status: ' + calculatedStatus.charAt(0).toUpperCase() + calculatedStatus.slice(1) + '\n' +
+        '🔒 This calendar qualifying is protected from duplicate creation.',
       ephemeral: true,
     });
   },

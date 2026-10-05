@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const qualifyingSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
+  calendarKey: { type: String, default: null, index: true },
   season: { type: String, required: true, index: true },
   sessionStartTime: { type: Date, required: true, index: true },
   predictionOpenTime: { type: Date, required: true },
@@ -20,5 +21,6 @@ const qualifyingSchema = new mongoose.Schema({
 
 qualifyingSchema.index({ season: 1, name: 1 }, { unique: true });
 qualifyingSchema.index({ season: 1, sessionStartTime: 1 });
+qualifyingSchema.index({ season: 1, calendarKey: 1 }, { unique: true, sparse: true });
 
 export const Qualifying = mongoose.model('Qualifying', qualifyingSchema);

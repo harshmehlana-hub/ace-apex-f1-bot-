@@ -18,6 +18,7 @@ import { Race } from '../database/models/Race.js';
 import { FeedbackResponse } from '../database/models/FeedbackResponse.js';
 import { FeedbackCampaign } from '../database/models/FeedbackCampaign.js';
 import { FeedbackSession } from '../database/models/FeedbackSession.js';
+import { getCurrentSeason } from './seasonService.js';
 
 let feedbackBroadcastRunning = false;
 
@@ -30,6 +31,7 @@ const ids = {
   statsRace: 'feedbackstats:race',
   prev: 'feedbackstats:prev',
   next: 'feedbackstats:next',
+  campaign: 'feedback:campaign',
 };
 
 function embed(title, description) {
@@ -224,98 +226,149 @@ export default {
   data: new SlashCommandBuilder()
     .setName('feedback')
     .setDescription('Send the Discord feedback form to Supporters and Race Pass holders')
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-    .addStringOption(option => option.setName('race').setDescription('Race for this feedback campaign').setRequired(true)),
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
-    if (feedbackBroadcastRunning) return interaction.reply({ content: '⚠️ A feedback DM broadcast is already running. Please wait for it to finish.', ephemeral: true });
-
-    const raceName = interaction.options.getString('race');
-    const race = await Race.findOne({ name: raceName, season: await getCurrentSeason() }).lean();
-    if (!race) return interaction.reply({ content: '❌ Race not found. Please use the exact race name.', ephemeral: true });
-
-    feedbackBroadcastRunning = true;
-    await FeedbackCampaign.findOneAndUpdate(
-      { guildId: interaction.guildId, raceKey: race._id.toString() },
-      { $set: { raceName: race.name, startedBy: interaction.user.id, startedAt: new Date() } },
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
-    await interaction.reply({ content: '📨 Feedback DM broadcast started for **' + race.name + '**.', ephemeral: true });
-
-    try {
-      const now = new Date();
-      const [memberships, racePasses] = await Promise.all([
-        Membership.find({ guildId: interaction.guildId, expiresAt: { $gt: now } }).select('userId'),
-        RacePass.find({ guildId: interaction.guildId, status: 'active', expiresAt: { $gt: now } }).select('userId'),
-      ]);
-      const userIds = new Set([...memberships.map(x => x.userId), ...racePasses.map(x => x.userId)]);
-      const results = await runWithConcurrency([...userIds], async (userId) => {
-        const user = await interaction.client.users.fetch(userId);
-        if (user.bot) return { skipped: true };
-
-        const raceKey = race._id.toString();
-        await FeedbackSession.findOneAndUpdate(
-          { guildId: interaction.guildId, raceKey, userId: user.id },
-          {
-            $set: {
-              raceName: race.name,
-              attended: null,
-              rating: null,
-              improvement: '',
-              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-            },
-            $setOnInsert: { guildId: interaction.guildId, raceKey, userId: user.id },
-          },
-          { upsert: true, new: true, setDefaultsOnInsert: true }
-        );
-
-        await user.send({
-          embeds: [embed('🏁 ' + race.name + ' — Race Feedback', "Thank you for supporting Ace's Apex!\n\nWe'd love to know how your race weekend experience was.")],
-          components: startRow(raceKey),
-        });
-        return { sent: true, username: user.username };
-      }, 5);
-
-      const sent = results.filter(r => r?.sent).length;
-      const failed = results.filter(r => r?.error).length;
-      const failedUsers = [];
-      for (let i = 0; i < results.length; i++) {
-        if (!results[i]?.error) continue;
-        try {
-          const failedUser = await interaction.client.users.fetch([...userIds][i]);
-          failedUsers.push('• ' + failedUser.username + ' (' + [...userIds][i] + ')');
-        } catch {
-          failedUsers.push('• <@' + [...userIds][i] + '> (' + [...userIds][i] + ')');
-        }
-      }
-
-      const channel = await interaction.client.channels.fetch(config.channels.dmLogs).catch(() => null);
-      if (channel) {
-        await channel.send(
-          '📨 **Feedback Broadcast Completed**\n' +
-          '🏁 **Race:** ' + race.name + '\n' +
-          '📨 **DMs sent:** ' + sent + '\n' +
-          '❌ **DMs failed:** ' + failed + '\n' +
-          '👥 **Total recipients:** ' + userIds.size
-        );
-
-        if (failedUsers.length) {
-          let list = failedUsers.join('\n');
-          while (list.length > 1900) {
-            const splitAt = list.lastIndexOf('\n', 1900);
-            const chunk = list.slice(0, splitAt > 0 ? splitAt : 1900);
-            await channel.send('❌ **Failed to DM:**\n' + chunk);
-            list = list.slice(splitAt > 0 ? splitAt + 1 : 1900);
-          }
-          if (list) await channel.send('❌ **Failed to DM:**\n' + list);
-        }
-      }
-    } finally {
-      feedbackBroadcastRunning = false;
+    if (!isAdmin(interaction.member, config.roles.admin)) {
+      return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     }
+    if (feedbackBroadcastRunning) {
+      return interaction.reply({ content: '⚠️ A feedback DM broadcast is already running. Please wait for it to finish.', ephemeral: true });
+    }
+
+    const season = await getCurrentSeason();
+    const races = await Race.find({
+      season,
+      status: { $in: ['closed', 'completed'] },
+    }).sort({ raceStartTime: -1 }).limit(25).lean();
+
+    if (!races.length) {
+      return interaction.reply({ content: '❌ No completed/closed races are available for feedback yet.', ephemeral: true });
+    }
+
+    return interaction.reply({
+      content: '🏁 Select the race you want to collect feedback for:',
+      ephemeral: true,
+      components: [
+        new ActionRowBuilder().addComponents(
+          new StringSelectMenuBuilder()
+            .setCustomId(ids.campaign)
+            .setPlaceholder('Select a race')
+            .addOptions(races.map((race) => ({
+              label: race.name.slice(0, 100),
+              value: race._id.toString(),
+            })))
+        ),
+      ],
+    });
   },
 };
+
+export async function handleFeedbackAdminInteraction(interaction) {
+  if (!interaction.isStringSelectMenu() || interaction.customId !== ids.campaign) return false;
+
+  if (!isAdmin(interaction.member, config.roles.admin)) {
+    return interaction.reply({ content: '❌ You do not have permission.', ephemeral: true });
+  }
+  if (feedbackBroadcastRunning) {
+    return interaction.reply({ content: '⚠️ A feedback DM broadcast is already running. Please wait for it to finish.', ephemeral: true });
+  }
+
+  const race = await Race.findOne({
+    _id: interaction.values[0],
+    season: await getCurrentSeason(),
+    status: { $in: ['closed', 'completed'] },
+  }).lean();
+
+  if (!race) {
+    return interaction.update({ content: '❌ That race is no longer available for feedback.', components: [] });
+  }
+
+  feedbackBroadcastRunning = true;
+  await FeedbackCampaign.findOneAndUpdate(
+    { guildId: interaction.guildId, raceKey: race._id.toString() },
+    { $set: { raceName: race.name, startedBy: interaction.user.id, startedAt: new Date() } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+  await interaction.update({
+    content: '📨 Feedback DM broadcast started for **' + race.name + '**.',
+    components: [],
+  });
+
+  try {
+    const now = new Date();
+    const [memberships, racePasses] = await Promise.all([
+      Membership.find({ guildId: interaction.guildId, expiresAt: { $gt: now } }).select('userId'),
+      RacePass.find({ guildId: interaction.guildId, status: 'active', expiresAt: { $gt: now } }).select('userId'),
+    ]);
+    const userIds = new Set([...memberships.map(x => x.userId), ...racePasses.map(x => x.userId)]);
+    const results = await runWithConcurrency([...userIds], async (userId) => {
+      const user = await interaction.client.users.fetch(userId);
+      if (user.bot) return { skipped: true };
+
+      const raceKey = race._id.toString();
+      await FeedbackSession.findOneAndUpdate(
+        { guildId: interaction.guildId, raceKey, userId: user.id },
+        {
+          $set: {
+            raceName: race.name,
+            attended: null,
+            rating: null,
+            improvement: '',
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          },
+          $setOnInsert: { guildId: interaction.guildId, raceKey, userId: user.id },
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
+
+      await user.send({
+        embeds: [embed('🏁 ' + race.name + ' — Race Feedback', "Thank you for supporting Ace's Apex!\n\nWe'd love to know how your race weekend experience was.")],
+        components: startRow(raceKey),
+      });
+      return { sent: true, username: user.username };
+    }, 5);
+
+    const sent = results.filter(r => r?.sent).length;
+    const failed = results.filter(r => r?.error).length;
+    const failedUsers = [];
+    for (let i = 0; i < results.length; i++) {
+      if (!results[i]?.error) continue;
+      try {
+        const failedUser = await interaction.client.users.fetch([...userIds][i]);
+        failedUsers.push('• ' + failedUser.username + ' (' + [...userIds][i] + ')');
+      } catch {
+        failedUsers.push('• <@' + [...userIds][i] + '> (' + [...userIds][i] + ')');
+      }
+    }
+
+    const channel = await interaction.client.channels.fetch(config.channels.dmLogs).catch(() => null);
+    if (channel) {
+      await channel.send(
+        '📨 **Feedback Broadcast Completed**\n' +
+        '🏁 **Race:** ' + race.name + '\n' +
+        '📨 **DMs sent:** ' + sent + '\n' +
+        '❌ **DMs failed:** ' + failed + '\n' +
+        '👥 **Total recipients:** ' + userIds.size
+      );
+
+      if (failedUsers.length) {
+        let list = failedUsers.join('\n');
+        while (list.length > 1900) {
+          const splitAt = list.lastIndexOf('\n', 1900);
+          const chunk = list.slice(0, splitAt > 0 ? splitAt : 1900);
+          await channel.send('❌ **Failed to DM:**\n' + chunk);
+          list = list.slice(splitAt > 0 ? splitAt + 1 : 1900);
+        }
+        if (list) await channel.send('❌ **Failed to DM:**\n' + list);
+      }
+    }
+  } finally {
+    feedbackBroadcastRunning = false;
+  }
+
+  return true;
+}
 
 function statsEmbed(raceName, response, page, total) {
   const rating = response.rating ? '⭐'.repeat(response.rating) + ' (' + response.rating + '/5)' : 'Not answered';
