@@ -10,7 +10,7 @@ export default {
       content:
         '🔒 **Privacy Policy**\n\n' +
         'You can view our privacy policy here:\n' +
-        'https://gist.githubusercontent.com/harshmehlana-hub/41b8aa247a59e674315419165582909a/raw/d79b0fcc407cf1c18d9550fa5bcc3969b4062151/gistfile1.txt',
+        'https://ace-apex-website.aceflarevisuals.workers.dev/privacy',
       ephemeral: true,
     });
   },
