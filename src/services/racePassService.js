@@ -15,7 +15,7 @@ async function removeRacePassRoleIfUnused(client, racePass) {
   if (!roleId) return;
   const now = new Date();
   const anotherActive = await RacePass.exists({ userId: racePass.userId, status: 'active', expiresAt: { $gt: now }, _id: { $ne: racePass._id } });
-  const legacyMembership = await Membership.exists({ userId: racePass.userId, type: 'race', expiresAt: { $gt: now } });
+  const legacyMembership = await Membership.exists({ userId: racePass.userId, guildId: racePass.guildId, type: 'race', expiresAt: { $gt: now } });
   if (!anotherActive && !legacyMembership) {
     await client.rest.delete(Routes.guildMemberRole(racePass.guildId, racePass.userId, roleId)).catch((error) => {
       if (error?.status !== 404) console.error('Failed to remove expired Race Pass role:', error);
