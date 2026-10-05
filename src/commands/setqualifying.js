@@ -35,9 +35,18 @@ export default {
     const predictionCloseTime = new Date(calendarRace.qualifyingStartAt.getTime() - config.timing.closeBefore);
     const now = new Date();
 
+    if (now >= calendarRace.qualifyingStartAt) {
+      return interaction.reply({
+        content:
+          `❌ **${calendarRace.qualifyingName} has already started/passed.**\\n\\n` +
+          `Session start: <t:${Math.floor(calendarRace.qualifyingStartAt.getTime() / 1000)}:F>\\n` +
+          'Past qualifying sessions cannot be newly activated with \`/setqualifying\`. Historical sessions remain available in the database.',
+        ephemeral: true,
+      });
+    }
+
     let calculatedStatus = 'upcoming';
     if (now >= predictionOpenTime && now < predictionCloseTime) calculatedStatus = 'open';
-    else if (now >= predictionCloseTime) calculatedStatus = 'closed';
 
     let qualifying = await Qualifying.findOne({ season, calendarKey });
     if (!qualifying) qualifying = await Qualifying.findOne({ season, name: calendarRace.qualifyingName });
@@ -53,7 +62,7 @@ export default {
 
       return interaction.reply({
         content:
-          '✅ **' + calendarRace.qualifyingName + ' is now linked to the 2026 season calendar.**\n\n' +
+          '✅ **' + calendarRace.qualifyingName + ' is now linked to the ' + season + ' season calendar.**\n\n' +
           '📅 Session Start: <t:' + Math.floor(calendarRace.qualifyingStartAt.getTime() / 1000) + ':F>\n' +
           '🟢 Predictions Open: <t:' + Math.floor(predictionOpenTime.getTime() / 1000) + ':F>\n' +
           '🔴 Predictions Close: <t:' + Math.floor(predictionCloseTime.getTime() / 1000) + ':F>\n' +
