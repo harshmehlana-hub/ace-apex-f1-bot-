@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { grantMembership } from '../services/membershipService.js';
 import { grantRacePass } from '../services/racePassService.js';
-import { RACE_PASSES_2026 } from '../config/racePasses2026.js';
+import { getAllRacePasses } from '../config/racePasses2026.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -17,7 +17,7 @@ export default {
       { name: 'Yearly', value: 'yearly' },
     ))
     .addStringOption(option => option.setName('race').setDescription('Race for the Race Pass (required when type is Race Pass)').setRequired(false).addChoices(
-      ...RACE_PASSES_2026.map(race => ({ name: race.name, value: race.key }))
+      ...getAllRacePasses().map(race => ({ name: race.name, value: race.key }))
     ))
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
