@@ -85,11 +85,20 @@ export async function processRacePasses(client) {
     if (!claimed) continue;
     try {
       await grantRacePassRole(client, claimed);
+    } catch (error) {
+      await RacePass.updateOne(
+        { _id: claimed._id, status: 'active' },
+        { $set: { status: 'scheduled', activatedAt: null } }
+      );
+      console.error('Failed to activate Race Pass role:', error);
+      continue;
+    }
+
+    try {
       const user = await client.users.fetch(claimed.userId);
       await user.send('**🏁 Your Race Pass is now active!**\n\n**Race:** ' + claimed.raceName + '\n**Valid until:** <t:' + Math.floor(claimed.expiresAt.getTime() / 1000) + ':F>\n\nEnjoy the race weekend with Ace\'s Apex! 🏎️');
     } catch (error) {
-      await RacePass.updateOne({ _id: claimed._id, status: 'active' }, { $set: { status: 'scheduled', activatedAt: null } });
-      console.error('Failed to activate Race Pass:', error);
+      console.error('Race Pass activation DM failed:', error);
     }
   }
 
