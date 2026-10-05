@@ -53,6 +53,7 @@ export default {
     // ----------------------------------------
     const membership = await Membership.findOne({
       userId: user.id,
+      guildId: interaction.guild.id,
     });
 
     if (!membership) {
