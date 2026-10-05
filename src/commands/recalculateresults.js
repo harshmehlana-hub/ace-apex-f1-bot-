@@ -6,6 +6,7 @@ import { reconcilePredictorOfTheWeekRoles } from '../services/roleService.js';
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { rebuildAllSeasonStandings } from '../services/seasonStandingService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('recalculateresults').setDescription('Correct previously entered race results (Admin only)').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -32,6 +33,7 @@ export default {
       await p2I.update({ content: `🥇 P1: ${p1}\n🥈 P2: ${p2}\n\nSelect new P3`, components: [menuFor('p3', 'New P3', [p1, p2])] });
       const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 }); const p3 = p3I.values[0];
       const newResult = { p1Driver: p1, p2Driver: p2, p3Driver: p3 };
+      await p3I.deferUpdate();
 
       const { scores, topIds } = await runInTransaction(async session => {
         oldResult.p1Driver = p1; oldResult.p2Driver = p2; oldResult.p3Driver = p3; oldResult.updatedBy = interaction.user.id; oldResult.enteredAt = new Date();
@@ -46,9 +48,10 @@ export default {
         return { scores: recalculated, topIds: recalculatedTopIds };
       });
 
+      await rebuildAllSeasonStandings(race.season);
       await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topIds);
 
-      await p3I.update({ content: `✅ **${race.name}** recalculated successfully.\n\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 All season standings and Predictor of the Week roles were reconciled.`, components: [] });
+      await p3I.editReply({ content: `✅ **${race.name}** recalculated successfully.\n\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 All season standings and Predictor of the Week roles were reconciled.`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Selection timed out.', components: [] });
