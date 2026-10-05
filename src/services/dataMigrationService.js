@@ -15,6 +15,27 @@ import { Membership } from '../database/models/Membership.js';
 const migrationName = 'v4-fast-current-season-score-reconciliation';
 
 
+
+async function runRacePassGuildSafetyMigration() {
+  const name = 'v5-racepass-guild-safe-index';
+  if (await SchemaMigration.exists({ name })) return;
+
+  const { RacePass } = await import('../database/models/RacePass.js');
+  try {
+    await RacePass.collection.dropIndex('userId_1_raceKey_1');
+  } catch (error) {
+    if (error?.codeName !== 'IndexNotFound' && error?.code !== 27) throw error;
+  }
+
+  await RacePass.collection.createIndex(
+    { guildId: 1, userId: 1, raceKey: 1 },
+    { unique: true, name: 'guildId_1_userId_1_raceKey_1' }
+  );
+
+  await SchemaMigration.create({ name });
+  console.log('[Migration] Race Pass records are now guild-safe.');
+}
+
 async function runMembershipGuildSafetyMigration() {
   const name = 'v5-membership-guild-safe-index';
   if (await SchemaMigration.exists({ name })) return;
@@ -36,6 +57,7 @@ async function runMembershipGuildSafetyMigration() {
 
 export async function runDataMigrations() {
   await runMembershipGuildSafetyMigration();
+  await runRacePassGuildSafetyMigration();
 
   if (await SchemaMigration.exists({ name: migrationName })) {
     console.log('[Migration] Already completed:', migrationName);
