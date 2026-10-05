@@ -157,6 +157,7 @@ export async function handleFeedbackInteraction(interaction) {
     const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     state.rating = Number(interaction.values[0]);
+    await state.save();
     return interaction.update({
       embeds: [embed('Question 3', '💬 **Any feedback to improve?**\n\nThis question is optional.')],
       components: commentRow(raceKey),
