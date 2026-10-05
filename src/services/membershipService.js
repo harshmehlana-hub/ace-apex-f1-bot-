@@ -21,7 +21,7 @@ export async function grantMembership({ client, guild, user, type, grantedBy, so
   const role = await guild.roles.fetch(roleId).catch(() => null);
   if (!role) throw new Error('Membership role not found.');
 
-  let membership = await Membership.findOne({ userId: user.id });
+  let membership = await Membership.findOne({ userId: user.id, guildId: guild.id });
 
   // Payment verification can safely retry the same request after a crash.
   // Never extend the membership twice for the same payment request.
