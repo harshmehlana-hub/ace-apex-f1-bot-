@@ -89,7 +89,7 @@ export async function rebuildAllSeasonStandings(season, options = {}) {
     Qualifying.find({ season, status: 'completed' }).select('_id').session(session).lean(),
     Prediction.find({ season }).select('userId raceId p1Driver p2Driver p3Driver').session(session).lean(),
     QualifyingPrediction.find({ season }).select('userId qualifyingId predictedDriver').session(session).lean(),
-    PointTransaction.find({ season }).select('userId amount createdAt').sort({ createdAt: 1, _id: 1 }).session(session).lean(),
+    PointTransaction.find({ season }).select('userId amount sourceType createdAt').sort({ createdAt: 1, _id: 1 }).session(session).lean(),
   ]);
 
   const raceIds = races.map(r => r._id);
