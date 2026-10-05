@@ -1,10 +1,9 @@
 const session = (key, name, qualifying, race, timezone, racePassKey = key) => {
   const qualifyingStartAt = new Date(qualifying);
   const raceStartAt = new Date(race);
-  const raceLocalParts = race.match(/^(\\d{4}-\\d{2}-\\d{2})T.*([+-]\\d{2}:\\d{2})$/);
-  const raceLocalMidnight = raceLocalParts
-    ? new Date(raceLocalParts[1] + 'T00:00:00' + raceLocalParts[2])
-    : new Date(raceStartAt);
+  const raceLocalDate = race.slice(0, 10);
+  const raceLocalOffset = race.slice(-6);
+  const raceLocalMidnight = new Date(raceLocalDate + 'T00:00:00' + raceLocalOffset);
   const weekendStartAt = new Date(raceLocalMidnight.getTime() - 2 * 24 * 60 * 60 * 1000);
 
   return {
