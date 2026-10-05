@@ -118,7 +118,8 @@ export async function handleFeedbackInteraction(interaction) {
   const id = interaction.customId || '';
 
   if (id === ids.start) {
-    const state = sessions.get(interaction.user.id);
+    const raceKey = interaction.customId.split(':')[2];
+    const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     const existing = await FeedbackResponse.exists({
       guildId: state.guildId,
@@ -126,7 +127,7 @@ export async function handleFeedbackInteraction(interaction) {
       userId: interaction.user.id,
     });
     if (existing) {
-      sessions.delete(interaction.user.id);
+      await FeedbackSession.deleteOne({ guildId: state.guildId, raceKey: state.raceKey, userId: interaction.user.id });
       return interaction.reply({ content: '✅ You have already submitted feedback for this race. Thank you! ❤️', ephemeral: true });
     }
     return interaction.update({
@@ -136,7 +137,8 @@ export async function handleFeedbackInteraction(interaction) {
   }
 
   if (id.startsWith(ids.attendance + ':')) {
-    const state = sessions.get(interaction.user.id);
+    const raceKey = interaction.customId.split(':')[2];
+    const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     state.attended = id.endsWith(':yes');
     if (!state.attended) {
@@ -151,7 +153,8 @@ export async function handleFeedbackInteraction(interaction) {
   }
 
   if (interaction.isStringSelectMenu() && id === ids.rating) {
-    const state = sessions.get(interaction.user.id);
+    const raceKey = interaction.customId.split(':')[2];
+    const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     state.rating = Number(interaction.values[0]);
     return interaction.update({
@@ -161,13 +164,15 @@ export async function handleFeedbackInteraction(interaction) {
   }
 
   if (id === ids.skip) {
-    const state = sessions.get(interaction.user.id);
+    const raceKey = interaction.customId.split(':')[2];
+    const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     return submit(interaction, state);
   }
 
   if (id === ids.comment) {
-    const state = sessions.get(interaction.user.id);
+    const raceKey = interaction.customId.split(':')[2];
+    const state = await getSession(interaction.user.id, raceKey);
     if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
     const modal = new ModalBuilder().setCustomId('feedback:modal').setTitle('Race Feedback');
     modal.addComponents(new ActionRowBuilder().addComponents(
