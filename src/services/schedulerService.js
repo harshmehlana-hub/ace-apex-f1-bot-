@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { randomUUID } from 'crypto';
 import { Routes } from 'discord.js';
 import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
@@ -11,13 +12,12 @@ import { getCurrentSeason } from './seasonService.js';
 import { processRacePasses } from './racePassService.js';
 import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
-
-let schedulerRunning = false;
+import { SchedulerLock } from '../database/models/SchedulerLock.js';
 
 export function setupScheduler(client) {
   const run = async () => {
-    if (schedulerRunning) return;
-    schedulerRunning = true;
+    const holder = await acquireSchedulerLock();
+    if (!holder) return;
     try {
       await Promise.allSettled([
         updateRaceStatuses(client),
@@ -29,13 +29,46 @@ export function setupScheduler(client) {
         processStalePaymentVerifications(),
       ]);
     } finally {
-      schedulerRunning = false;
+      await releaseSchedulerLock(holder);
     }
   };
 
   run().catch(error => console.error('Initial scheduler run failed:', error));
   cron.schedule('* * * * *', () => run().catch(error => console.error('Scheduler cycle failed:', error)));
   console.log('Scheduler initialized');
+}
+
+
+async function acquireSchedulerLock() {
+  const now = new Date();
+  const holder = randomUUID();
+  const expiresAt = new Date(now.getTime() + 90 * 1000);
+
+  const existing = await SchedulerLock.findOneAndUpdate(
+    {
+      _id: 'global',
+      $or: [
+        { expiresAt: { $lte: now } },
+        { expiresAt: { $exists: false } },
+      ],
+    },
+    { $set: { holder, expiresAt } },
+    { new: true }
+  );
+
+  if (existing) return holder;
+
+  try {
+    await SchedulerLock.create({ _id: 'global', holder, expiresAt });
+    return holder;
+  } catch (error) {
+    if (error?.code === 11000) return null;
+    throw error;
+  }
+}
+
+async function releaseSchedulerLock(holder) {
+  await SchedulerLock.deleteOne({ _id: 'global', holder });
 }
 
 function getTimeStatus(openTime, closeTime, now) {
@@ -103,7 +136,9 @@ async function processPredictionReminders(client, session, isQualifying) {
     { key: 'reminder1hSent', offset: 60 * 60 * 1000, label: '1 hour' },
   ];
 
-  const reminderWindow = 90 * 1000;
+  // Allow a short catch-up window so a brief Railway restart does not permanently lose a reminder.
+  // The window is intentionally much smaller than the gap between reminders.
+  const reminderWindow = 10 * 60 * 1000;
 
   for (const reminder of thresholds) {
     const reminderAt = startTime - reminder.offset;
