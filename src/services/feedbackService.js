@@ -19,8 +19,6 @@ import { FeedbackCampaign } from '../database/models/FeedbackCampaign.js';
 import { FeedbackSession } from '../database/models/FeedbackSession.js';
 
 let feedbackBroadcastRunning = false;
-const sessions = new Map();
-const statsSessions = new Map();
 
 const ids = {
   start: 'feedback:start',
@@ -72,6 +70,14 @@ function commentRow() {
   )];
 }
 
+async function getSession(userId, raceKey) {
+  return FeedbackSession.findOne({
+    userId,
+    raceKey,
+    expiresAt: { $gt: new Date() },
+  });
+}
+
 async function save(state, user) {
   return FeedbackResponse.findOneAndUpdate(
     { guildId: state.guildId, raceKey: state.raceKey, userId: user.id },
@@ -98,7 +104,7 @@ async function logSubmission(client, user, raceName) {
 
 async function submit(interaction, state) {
   await save(state, interaction.user);
-  sessions.delete(interaction.user.id);
+  await FeedbackSession.deleteOne({ guildId: state.guildId, raceKey: state.raceKey, userId: interaction.user.id });
   await interaction.update({
     content: '✅ **Feedback submitted!**\n\nThank you for helping us improve Ace\'s Apex. ❤️🏁',
     embeds: [],
