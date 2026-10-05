@@ -333,10 +333,10 @@ function statsEmbed(raceName, response, page, total) {
     .setTimestamp(response.submittedAt);
 }
 
-function statsRows(page, total) {
+function statsRows(raceKey, page, total, userId) {
   return [new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(ids.prev).setLabel('◀ Previous').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
-    new ButtonBuilder().setCustomId(ids.next).setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= total)
+    new ButtonBuilder().setCustomId(ids.prev + ':' + raceKey + ':' + (page - 1) + ':' + userId).setLabel('◀ Previous').setStyle(ButtonStyle.Secondary).setDisabled(page <= 1),
+    new ButtonBuilder().setCustomId(ids.next + ':' + raceKey + ':' + (page + 1) + ':' + userId).setLabel('Next ▶').setStyle(ButtonStyle.Secondary).setDisabled(page >= total)
   )];
 }
 
@@ -373,7 +373,7 @@ export async function handleFeedbackStatsInteraction(interaction) {
     const responses = await FeedbackResponse.find({ guildId: interaction.guildId, raceKey }).sort({ submittedAt: 1 }).lean();
     if (!race || !responses.length) return interaction.update({ content: '📊 No responses found for that race.', components: [] });
     const state = { userId: interaction.user.id, raceName: race.raceName, responses, page: 1 };
-    const reply = await interaction.update({ content: null, embeds: [statsEmbed(race.raceName, responses[0], 1, responses.length)], components: statsRows(1, responses.length) });
+    const reply = await interaction.update({ content: null, embeds: [statsEmbed(race.raceName, responses[0], 1, responses.length)], components: statsRows(raceKey, 1, responses.length, interaction.user.id) });
     statsSessions.set(interaction.message.id, state);
     return reply;
   }
