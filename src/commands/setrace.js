@@ -3,6 +3,7 @@ import { Race } from '../database/models/Race.js';
 import { config } from '../config.js';
 import { isAdmin, parseISTDateTime } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
+import { getRacePassesForSeason } from '../config/racePasses2026.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -26,6 +27,13 @@ export default {
         .setDescription('Race start time in IST (HH:MM)')
         .setRequired(true)
     )
+    .addStringOption(option =>
+      option
+        .setName('racepass_key')
+        .setDescription('Optional Race Pass calendar key for this race')
+        .setRequired(false)
+        .addChoices(...getRacePassesForSeason(new Date().getUTCFullYear()).map(r => ({ name: r.name, value: r.key })))
+    )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   
   async execute(interaction) {
@@ -40,6 +48,7 @@ export default {
     const name = interaction.options.getString('name').trim();
     const dateStr = interaction.options.getString('date');
     const timeStr = interaction.options.getString('time');
+    const racePassKey = interaction.options.getString('racepass_key');
     const raceStartTime = parseISTDateTime(dateStr, timeStr);
 
     if (!raceStartTime) {
@@ -74,6 +83,7 @@ export default {
     const race = new Race({
       name,
       season,
+      racePassKey: racePassKey || null,
       raceStartTime,
       predictionOpenTime,
       predictionCloseTime,
