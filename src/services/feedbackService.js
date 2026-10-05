@@ -375,15 +375,17 @@ export async function handleFeedbackStatsInteraction(interaction) {
     return interaction.update({ content: null, embeds: [statsEmbed(race.raceName, responses[0], 1, responses.length)], components: statsRows(raceKey, 1, responses.length, interaction.user.id) });
   }
 
-  if (interaction.customId === ids.prev || interaction.customId === ids.next) {
-    const state = statsSessions.get(interaction.message.id);
-    if (!state) return interaction.reply({ content: '❌ This feedback stats session has expired.', ephemeral: true });
-    if (interaction.user.id !== state.userId) return interaction.reply({ content: '❌ Only the admin who opened these stats can navigate pages.', ephemeral: true });
-    if (interaction.customId === ids.next) state.page++;
-    else state.page--;
-    state.page = Math.max(1, Math.min(state.responses.length, state.page));
-    return interaction.update({ embeds: [statsEmbed(state.raceName, state.responses[state.page - 1], state.page, state.responses.length)], components: statsRows(state.page, state.responses.length) });
+  if (interaction.customId.startsWith(ids.prev + ':') || interaction.customId.startsWith(ids.next + ':')) {
+    const [, , raceKey, requestedPage, ownerId] = interaction.customId.split(':');
+    if (interaction.user.id !== ownerId) return interaction.reply({ content: '❌ Only the admin who opened these stats can navigate pages.', ephemeral: true });
+    const race = (await getFeedbackRaces(interaction.guildId)).find(r => r.raceKey === raceKey);
+    const responses = await FeedbackResponse.find({ guildId: interaction.guildId, raceKey }).sort({ submittedAt: 1 }).lean();
+    if (!race || !responses.length) return interaction.reply({ content: '📊 No responses found for that race.', ephemeral: true });
+    const page = Math.max(1, Math.min(responses.length, Number(requestedPage) || 1));
+    return interaction.update({
+      embeds: [statsEmbed(race.raceName, responses[page - 1], page, responses.length)],
+      components: statsRows(raceKey, page, responses.length, ownerId),
+    });
   }
-
   return false;
 }
