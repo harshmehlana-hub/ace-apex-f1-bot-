@@ -13,9 +13,16 @@ const membershipSchema = new mongoose.Schema({
   },
 
   roleId: {
-  type: String,
-  default: null,
-},
+    type: String,
+    default: null,
+  },
+
+  paymentRequestId: {
+    type: String,
+    default: null,
+    sparse: true,
+    unique: true,
+  },
 
   type: {
     type: String,
