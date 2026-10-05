@@ -159,7 +159,7 @@ export async function handleFeedbackInteraction(interaction) {
     state.rating = Number(interaction.values[0]);
     return interaction.update({
       embeds: [embed('Question 3', '💬 **Any feedback to improve?**\n\nThis question is optional.')],
-      components: commentRow(),
+      components: commentRow(raceKey),
     });
   }
 
@@ -191,8 +191,9 @@ export async function handleFeedbackInteraction(interaction) {
 }
 
 export async function handleFeedbackModal(interaction) {
-  if (!interaction.isModalSubmit() || interaction.customId !== 'feedback:modal') return false;
-  const state = sessions.get(interaction.user.id);
+  if (!interaction.isModalSubmit() || !interaction.customId.startsWith('feedback:modal:')) return false;
+  const raceKey = interaction.customId.split(':')[2];
+  const state = await getSession(interaction.user.id, raceKey);
   if (!state) return interaction.reply({ content: '❌ This feedback session has expired. Please use the latest feedback DM.', ephemeral: true });
   state.improvement = interaction.fields.getTextInputValue('improvement').trim();
   return submit(interaction, state);
@@ -209,7 +210,7 @@ export default {
     if (feedbackBroadcastRunning) return interaction.reply({ content: '⚠️ A feedback DM broadcast is already running. Please wait for it to finish.', ephemeral: true });
 
     const raceName = interaction.options.getString('race');
-    const race = await Race.findOne({ name: raceName, season: config.season }).lean();
+    const race = await Race.findOne({ name: raceName, season: await getCurrentSeason() }).lean();
     if (!race) return interaction.reply({ content: '❌ Race not found. Please use the exact race name.', ephemeral: true });
 
     feedbackBroadcastRunning = true;
@@ -235,17 +236,24 @@ export default {
         try {
           const user = await interaction.client.users.fetch(userId);
           if (user.bot) continue;
-          sessions.set(user.id, {
-            guildId: interaction.guildId,
-            raceKey: race._id.toString(),
-            raceName: race.name,
-            attended: null,
-            rating: null,
-            improvement: '',
-          });
+          const raceKey = race._id.toString();
+          await FeedbackSession.findOneAndUpdate(
+            { guildId: interaction.guildId, raceKey, userId: user.id },
+            {
+              $set: {
+                raceName: race.name,
+                attended: null,
+                rating: null,
+                improvement: '',
+                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+              },
+              $setOnInsert: { guildId: interaction.guildId, raceKey, userId: user.id },
+            },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+          );
           await user.send({
             embeds: [embed('🏁 ' + race.name + ' — Race Feedback', "Thank you for supporting Ace's Apex!\n\nWe'd love to know how your race weekend experience was.")],
-            components: startRow(),
+            components: startRow(race._id.toString()),
           });
           sent++;
         } catch (error) {
