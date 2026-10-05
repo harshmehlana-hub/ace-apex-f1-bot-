@@ -3,7 +3,7 @@ import { Race } from '../database/models/Race.js';
 import { config } from '../config.js';
 import { isAdmin, parseISTDateTime } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
-import { getRacePassesForSeason } from '../config/racePasses2026.js';
+import { getRacePassesForSeason, getRacePass } from '../config/racePasses2026.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -50,6 +50,7 @@ export default {
     const timeStr = interaction.options.getString('time');
     const racePassKey = interaction.options.getString('racepass_key');
     const raceStartTime = parseISTDateTime(dateStr, timeStr);
+    const season = await getCurrentSeason();
 
     if (!raceStartTime) {
       return interaction.reply({
@@ -58,7 +59,14 @@ export default {
       });
     }
 
-    const season = await getCurrentSeason();
+    const linkedRacePass = racePassKey ? getRacePass(racePassKey, season) : null;
+    if (racePassKey && !linkedRacePass) {
+      return interaction.reply({ content: '❌ That Race Pass calendar entry is not configured for the active season.', ephemeral: true });
+    }
+    if (linkedRacePass && Math.abs(raceStartTime.getTime() - linkedRacePass.raceStartAt.getTime()) > 5 * 60 * 1000) {
+      return interaction.reply({ content: '❌ The race time does not match the linked Race Pass calendar. Please use the official Race Pass time.', ephemeral: true });
+    }
+
     const existingRace = await Race.findOne({ season, name });
     if (existingRace) {
       return interaction.reply({
