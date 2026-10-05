@@ -258,10 +258,10 @@ async function processReminders(client) {
 
 
 async function processCancelledRacePasses(client) {
-  const cancelledRaces = await Race.find({ status: 'cancelled' }).select('name season').limit(200).lean();
+  const cancelledRaces = await Race.find({ status: 'cancelled' }).select('name season racePassKey').limit(200).lean();
   for (const race of cancelledRaces) {
     try {
-      await cancelRacePassesForRace(client, config.guildId, race.name);
+      await cancelRacePassesForRace(client, config.guildId, race.name, race.racePassKey);
     } catch (error) {
       console.error('Failed to reconcile cancelled Race Passes for ' + race.name + ':', error);
     }
