@@ -1,11 +1,13 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, PermissionFlagsBits } from 'discord.js';
 
 import { logDM } from '../utils/dmLogger.js';
+import { config } from '../config.js';
 
 export default {
   data: new SlashCommandBuilder()
     .setName('dm')
     .setDescription('Send a DM to a user')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild)
 
     .addUserOption(option =>
       option
@@ -23,15 +25,8 @@ export default {
 
   async execute(interaction, client) {
 
-    const STAFF_ROLES = [
-      '1533445133427806268', //paul
-      '1476275477416247338', //admins
-      '1506635584322670702', //communitymanager
-    ];
+    const allowed = interaction.member.permissions.has(PermissionFlagsBits.ManageGuild) || interaction.member.permissions.has(PermissionFlagsBits.Administrator) || interaction.member.roles.cache.has(config.roles.admin);
 
-    const allowed = STAFF_ROLES.some(roleId =>
-      interaction.member.roles.cache.has(roleId)
-    );
 
     if (!allowed) {
       return interaction.reply({
