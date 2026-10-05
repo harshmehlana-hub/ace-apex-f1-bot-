@@ -24,7 +24,7 @@ const racePassSchema = new mongoose.Schema({
   expiredAt: { type: Date, default: null },
 }, { timestamps: true });
 
-racePassSchema.index({ userId: 1, raceKey: 1 }, { unique: true });
+racePassSchema.index({ guildId: 1, userId: 1, raceKey: 1 }, { unique: true });
 racePassSchema.index({ status: 1, activationAt: 1 });
 racePassSchema.index({ status: 1, expiresAt: 1 });
 
