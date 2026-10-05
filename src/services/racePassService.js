@@ -77,6 +77,35 @@ export async function grantRacePass({ client, guild, user, raceKey, paymentReque
   return createRacePass({ client, guild, user, paymentRequest, raceKey, ignoreWindow: true });
 }
 
+
+export async function cancelRacePassesForRace(client, guildId, raceName) {
+  const passes = await RacePass.find({
+    guildId,
+    raceName,
+    status: { $in: ['scheduled', 'active'] },
+  }).limit(200);
+
+  for (const racePass of passes) {
+    const claimed = await RacePass.findOneAndUpdate(
+      { _id: racePass._id, status: { $in: ['scheduled', 'active'] } },
+      { $set: { status: 'cancelled', expiredAt: new Date() } },
+      { new: true }
+    );
+    if (!claimed) continue;
+
+    if (racePass.status === 'active') {
+      await removeRacePassRoleIfUnused(client, claimed);
+    }
+
+    try {
+      const user = await client.users.fetch(claimed.userId);
+      await user.send('⚠️ **Race Pass cancelled**\n\nThe **' + claimed.raceName + '** event was cancelled, so your Race Pass has been cancelled. Please contact the Ace\'s Apex team if the event is rescheduled.');
+    } catch (error) {
+      console.error('Race Pass cancellation DM failed:', error);
+    }
+  }
+}
+
 export async function processRacePasses(client) {
   const now = new Date();
   const scheduled = await RacePass.find({ status: 'scheduled', activationAt: { $lte: now }, expiresAt: { $gt: now } }).limit(200);
