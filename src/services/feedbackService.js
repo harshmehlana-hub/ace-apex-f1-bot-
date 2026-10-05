@@ -8,6 +8,7 @@ import {
   StringSelectMenuBuilder,
   TextInputBuilder,
   TextInputStyle,
+  PermissionFlagsBits,
 } from 'discord.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
@@ -222,6 +223,7 @@ export default {
   data: new SlashCommandBuilder()
     .setName('feedback')
     .setDescription('Send the Discord feedback form to Supporters and Race Pass holders')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addStringOption(option => option.setName('race').setDescription('Race for this feedback campaign').setRequired(true)),
 
   async execute(interaction) {
@@ -348,7 +350,8 @@ async function getFeedbackRaces(guildId) {
 export const feedbackStatsCommand = {
   data: new SlashCommandBuilder()
     .setName('feedbackstats')
-    .setDescription('View submitted race feedback (Admin only)'),
+    .setDescription('View submitted race feedback (Admin only)')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
     if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
