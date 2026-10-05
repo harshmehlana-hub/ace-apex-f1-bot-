@@ -199,6 +199,24 @@ export async function handleFeedbackModal(interaction) {
   return submit(interaction, state);
 }
 
+async function runWithConcurrency(items, worker, concurrency = 5) {
+  let next = 0;
+  const results = [];
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      try {
+        results[index] = await worker(items[index]);
+      } catch (error) {
+        results[index] = { error };
+      }
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('feedback')
@@ -232,39 +250,43 @@ export default {
       let failed = 0;
       const failedUsers = [];
 
-      for (const userId of userIds) {
-        try {
-          const user = await interaction.client.users.fetch(userId);
-          if (user.bot) continue;
-          const raceKey = race._id.toString();
-          await FeedbackSession.findOneAndUpdate(
-            { guildId: interaction.guildId, raceKey, userId: user.id },
-            {
-              $set: {
-                raceName: race.name,
-                attended: null,
-                rating: null,
-                improvement: '',
-                expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-              },
-              $setOnInsert: { guildId: interaction.guildId, raceKey, userId: user.id },
+      const results = await runWithConcurrency([...userIds], async (userId) => {
+        const user = await interaction.client.users.fetch(userId);
+        if (user.bot) return { skipped: true };
+
+        const raceKey = race._id.toString();
+        await FeedbackSession.findOneAndUpdate(
+          { guildId: interaction.guildId, raceKey, userId: user.id },
+          {
+            $set: {
+              raceName: race.name,
+              attended: null,
+              rating: null,
+              improvement: '',
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
             },
-            { upsert: true, new: true, setDefaultsOnInsert: true }
-          );
-          await user.send({
-            embeds: [embed('🏁 ' + race.name + ' — Race Feedback', "Thank you for supporting Ace's Apex!\n\nWe'd love to know how your race weekend experience was.")],
-            components: startRow(race._id.toString()),
-          });
-          sent++;
-        } catch (error) {
-          failed++;
-          try {
-            const failedUser = await interaction.client.users.fetch(userId);
-            failedUsers.push('• ' + failedUser.username + ' (' + userId + ')');
-          } catch {
-            failedUsers.push('• <@' + userId + '> (' + userId + ')');
-          }
-          console.error('Feedback DM failed for ' + userId + ':', error?.message || error);
+            $setOnInsert: { guildId: interaction.guildId, raceKey, userId: user.id },
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        await user.send({
+          embeds: [embed('🏁 ' + race.name + ' — Race Feedback', "Thank you for supporting Ace's Apex!\n\nWe'd love to know how your race weekend experience was.")],
+          components: startRow(raceKey),
+        });
+        return { sent: true, username: user.username };
+      }, 5);
+
+      const sent = results.filter(r => r?.sent).length;
+      const failed = results.filter(r => r?.error).length;
+      const failedUsers = [];
+      for (let i = 0; i < results.length; i++) {
+        if (!results[i]?.error) continue;
+        try {
+          const failedUser = await interaction.client.users.fetch([...userIds][i]);
+          failedUsers.push('• ' + failedUser.username + ' (' + [...userIds][i] + ')');
+        } catch {
+          failedUsers.push('• <@' + [...userIds][i] + '> (' + [...userIds][i] + ')');
         }
       }
 
