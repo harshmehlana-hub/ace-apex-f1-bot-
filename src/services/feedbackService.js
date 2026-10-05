@@ -16,6 +16,7 @@ import { RacePass } from '../database/models/RacePass.js';
 import { Race } from '../database/models/Race.js';
 import { FeedbackResponse } from '../database/models/FeedbackResponse.js';
 import { FeedbackCampaign } from '../database/models/FeedbackCampaign.js';
+import { FeedbackSession } from '../database/models/FeedbackSession.js';
 
 let feedbackBroadcastRunning = false;
 const sessions = new Map();
