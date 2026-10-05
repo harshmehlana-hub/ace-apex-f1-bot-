@@ -77,21 +77,17 @@ export default {
             membership.roleId
           )
         );
-
-        console.log(
-          `✅ Membership role ${membership.roleId} removed from ${user.id}`
-        );
+        console.log(`✅ Membership role ${membership.roleId} removed from ${user.id}`);
       } catch (error) {
-        console.error(
-          '❌ Failed to remove membership role:',
-          error
-        );
-
-        // If the role/member is already gone, we still
-        // continue deleting the MongoDB membership.
+        if (error?.status !== 404) {
+          console.error('❌ Failed to remove membership role:', error);
+          return interaction.reply({
+            content: '❌ The Discord role could not be removed, so the membership record was kept for retry.',
+            ephemeral: true,
+          });
+        }
       }
     }
-
     // ----------------------------------------
     // DELETE MEMBERSHIP FROM MONGODB
     // ----------------------------------------
