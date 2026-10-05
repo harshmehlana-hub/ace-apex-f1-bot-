@@ -53,6 +53,10 @@ const paymentVerificationSchema = new mongoose.Schema({
     default: 'pending',
     required: true,
   },
+  processingAt: {
+    type: Date,
+    default: null,
+  },
   verifiedBy: {
     type: String,
     default: null,
