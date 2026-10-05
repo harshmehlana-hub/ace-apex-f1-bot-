@@ -103,6 +103,20 @@ export default {
 
       const predictedDriver = driverInteraction.values[0];
 
+      const finalCheck = await Qualifying.findOne({
+        _id: selectedSession._id,
+        season: activeSeason,
+        status: 'open',
+        predictionOpenTime: { $lte: new Date() },
+        predictionCloseTime: { $gt: new Date() },
+      });
+      if (!finalCheck) {
+        return driverInteraction.update({
+          content: '❌ Predictions for this qualifying session have closed. Your prediction was not submitted.',
+          components: [],
+        });
+      }
+
       const doubleCheck =
         await QualifyingPrediction.findOne({
           userId: interaction.user.id,
