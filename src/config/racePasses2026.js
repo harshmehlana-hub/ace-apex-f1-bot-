@@ -33,10 +33,24 @@ export const RACE_PASSES_2026 = [
   race('abu-dhabi', 'Abu Dhabi Grand Prix', '2026-12-04T00:00:00+04:00', '2026-12-06T17:00:00+04:00', 'Asia/Dubai'),
 ];
 
-export function getAvailableRacePasses(now = new Date()) {
-  return RACE_PASSES_2026.filter((race) => now >= race.purchaseStartAt && now <= race.purchaseEndAt);
+export function getAvailableRacePasses(now = new Date(), season = String(now.getUTCFullYear())) {
+  return getRacePassesForSeason(season).filter((race) => now >= race.purchaseStartAt && now <= race.purchaseEndAt);
 }
 
-export function getRacePass(key) {
-  return RACE_PASSES_2026.find((race) => race.key === key) || null;
+export function getRacePass(key, season = null) {
+  const races = season == null ? getAllRacePasses() : getRacePassesForSeason(season);
+  return races.find((race) => race.key === key) || null;
+}
+
+
+export const RACE_PASSES_BY_SEASON = {
+  '2026': RACE_PASSES_2026,
+};
+
+export function getRacePassesForSeason(season) {
+  return RACE_PASSES_BY_SEASON[String(season)] || [];
+}
+
+export function getAllRacePasses() {
+  return Object.values(RACE_PASSES_BY_SEASON).flat();
 }
