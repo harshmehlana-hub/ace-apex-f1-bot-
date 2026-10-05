@@ -26,6 +26,7 @@ export function setupScheduler(client) {
         processMemberships(client),
         processRacePasses(client),
         processGoogleSheetSync(client),
+        processStalePaymentVerifications(),
       ]);
     } finally {
       schedulerRunning = false;
@@ -237,40 +238,90 @@ async function processGoogleSheetSync(client) {
 
 async function processMemberships(client) {
   const now = new Date();
-  const memberships = await Membership.find({ expiresAt: { $lte: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000) } }).limit(200);
+  const memberships = await Membership.find({
+    expiresAt: { $lte: new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000) },
+  }).limit(200);
 
   for (const membership of memberships) {
     try {
-      const guild = await client.guilds.fetch(membership.guildId);
-      if (!guild) continue;
-      const member = await guild.members.fetch(membership.userId).catch(() => null);
+      await client.guilds.fetch(membership.guildId);
 
       const fiveDays = membership.expiresAt.getTime() - 5 * 24 * 60 * 60 * 1000;
       const oneDay = membership.expiresAt.getTime() - 24 * 60 * 60 * 1000;
 
       if (now.getTime() >= fiveDays && now < membership.expiresAt && !membership.fiveDayReminderSent) {
-        const claimed = await Membership.findOneAndUpdate({ _id: membership._id, fiveDayReminderSent: false }, { $set: { fiveDayReminderSent: true } }, { new: true });
-        if (claimed && !(await sendMembershipDM(client, membership, '5 days remaining', `Your ${membership.type} membership expires in 5 days.`))) await Membership.updateOne({ _id: membership._id }, { $set: { fiveDayReminderSent: false } });
+        const claimed = await Membership.findOneAndUpdate(
+          { _id: membership._id, fiveDayReminderSent: false },
+          { $set: { fiveDayReminderSent: true } },
+          { new: true }
+        );
+        if (claimed && !(await sendMembershipDM(client, membership, '5 days remaining', `Your ${membership.type} membership expires in 5 days.`))) {
+          await Membership.updateOne({ _id: membership._id }, { $set: { fiveDayReminderSent: false } });
+        }
       }
 
       if (now.getTime() >= oneDay && now < membership.expiresAt && !membership.oneDayReminderSent) {
-        const claimed = await Membership.findOneAndUpdate({ _id: membership._id, oneDayReminderSent: false }, { $set: { oneDayReminderSent: true } }, { new: true });
-        if (claimed && !(await sendMembershipDM(client, membership, '1 day remaining', `Your ${membership.type} membership expires tomorrow.`))) await Membership.updateOne({ _id: membership._id }, { $set: { oneDayReminderSent: false } });
+        const claimed = await Membership.findOneAndUpdate(
+          { _id: membership._id, oneDayReminderSent: false },
+          { $set: { oneDayReminderSent: true } },
+          { new: true }
+        );
+        if (claimed && !(await sendMembershipDM(client, membership, '1 day remaining', `Your ${membership.type} membership expires tomorrow.`))) {
+          await Membership.updateOne({ _id: membership._id }, { $set: { oneDayReminderSent: false } });
+        }
       }
 
-      if (now >= membership.expiresAt && !membership.expiryReminderSent) {
-        const claimed = await Membership.findOneAndUpdate({ _id: membership._id, expiryReminderSent: false }, { $set: { expiryReminderSent: true } }, { new: true });
-        if (!claimed) continue;
-        if (member && membership.roleId) {
-          await client.rest.delete(Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)).catch(error => {
-            if (error?.status !== 404) console.error('Failed to remove expired membership role:', error);
-          });
+      if (now >= membership.expiresAt) {
+        let roleRemovalSucceeded = true;
+
+        if (membership.roleId) {
+          try {
+            await client.rest.delete(
+              Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)
+            );
+          } catch (error) {
+            if (error?.status !== 404) {
+              roleRemovalSucceeded = false;
+              console.error('Failed to remove expired membership role:', error);
+            }
+          }
         }
-        await sendMembershipDM(client, membership, 'Membership expired', `Your ${membership.type} membership has expired.`);
+
+        if (!roleRemovalSucceeded) continue;
+
+        const claimed = await Membership.findOneAndUpdate(
+          { _id: membership._id, expiryReminderSent: false },
+          { $set: { expiryReminderSent: true } },
+          { new: true }
+        );
+
+        if (claimed) {
+          await sendMembershipDM(client, membership, 'Membership expired', `Your ${membership.type} membership has expired.`);
+        }
+
         await Membership.deleteOne({ _id: membership._id });
       }
     } catch (error) {
       console.error(`Failed to process membership ${membership._id}:`, error);
+    }
+  }
+}
+
+async function processStalePaymentVerifications() {
+  const cutoff = new Date(Date.now() - 10 * 60 * 1000);
+  const stale = await PaymentVerification.find({
+    status: 'processing',
+    processingAt: { $lte: cutoff },
+  }).limit(50);
+
+  for (const payment of stale) {
+    const claimed = await PaymentVerification.findOneAndUpdate(
+      { _id: payment._id, status: 'processing', processingAt: { $lte: cutoff } },
+      { $set: { status: 'pending', processingAt: null, verifiedBy: null } },
+      { new: true }
+    );
+    if (claimed) {
+      console.warn('[Payments] Reset stale verification ' + claimed.requestId + ' to pending for retry.');
     }
   }
 }
