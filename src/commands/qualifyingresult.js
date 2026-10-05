@@ -45,12 +45,17 @@ export default {
         return { predictions: scored, correctPredictions: scored.filter(s => s.pointsAwarded === config.qualifyingScoring.correct).length };
       });
 
-      await rebuildAllSeasonStandings(qualifying.season);
-
       try {
         const resultsChannel = await client.channels.fetch(config.channels.results);
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏁 Qualifying Results are OUT!', embeds: [createQualifyingResultsEmbed(qualifying, { poleDriver }, correctPredictions, predictions.length)] });
       } catch (error) { console.error('Failed to publish qualifying results:', error); }
+
+      try {
+        await rebuildAllSeasonStandings(qualifying.season);
+      } catch (error) {
+        console.error('Qualifying result was processed, but season standings rebuild failed:', error);
+      }
+
       await poleI.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${qualifying.name}\n🏆 Pole Position: ${poleDriver}\n\n🎯 Correct Predictions: ${correctPredictions}\n📊 Total Predictions: ${predictions.length}`, components: [] });
     } catch (error) {
       console.error(error);
