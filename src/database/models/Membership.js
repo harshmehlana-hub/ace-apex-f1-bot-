@@ -4,7 +4,6 @@ const membershipSchema = new mongoose.Schema({
   userId: {
     type: String,
     required: true,
-    unique: true,
   },
 
   guildId: {
@@ -48,6 +47,8 @@ const membershipSchema = new mongoose.Schema({
     default: false,
   },
 }, { timestamps: true });
+
+membershipSchema.index({ guildId: 1, userId: 1 }, { unique: true });
 
 membershipSchema.index(
   { paymentRequestId: 1 },
