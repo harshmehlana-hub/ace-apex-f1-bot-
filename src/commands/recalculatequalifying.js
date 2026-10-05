@@ -5,6 +5,7 @@ import { recalculateQualifyingScores, runInTransaction } from '../services/scori
 import { getDriverSelectOptions } from '../utils/drivers.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { rebuildAllSeasonStandings } from '../services/seasonStandingService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('recalculatequalifying').setDescription('Correct previously entered qualifying results (Admin only)').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -24,13 +25,15 @@ export default {
       await qI.update({ content: `🔄 **${qualifying.name}**\nCurrent pole: ${result.poleDriver}\n\nSelect the corrected pole driver:`, components: [menu2] });
       const poleI = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
       const poleDriver = poleI.values[0];
+      await poleI.deferUpdate();
       await runInTransaction(async session => {
         result.poleDriver = poleDriver;
         result.updatedBy = interaction.user.id;
         await result.save({ session });
         await recalculateQualifyingScores(qualifying, result, { session });
       });
-      await poleI.update({ content: `✅ **${qualifying.name}** recalculated successfully.\n\n🏆 Pole Position: ${poleDriver}\n\n📊 Season standings were reconciled.`, components: [] });
+      await rebuildAllSeasonStandings(qualifying.season);
+      await poleI.editReply({ content: `✅ **${qualifying.name}** recalculated successfully.\n\n🏆 Pole Position: ${poleDriver}\n\n📊 Season standings were reconciled.`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Selection timed out.', components: [] });
