@@ -288,6 +288,7 @@ async function verifyPayment(interaction, client, requestId) {
 
     request.status = 'verified';
     request.verifiedAt = new Date();
+    request.processingAt = null;
     await request.save();
     await syncVerifiedPaymentToSheet(request, user);
   } catch (error) {
