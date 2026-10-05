@@ -29,7 +29,14 @@ export async function createRacePass({ client, guild, user, paymentRequest, race
   const now = new Date();
   if (!ignoreWindow && (now < race.purchaseStartAt || now > race.purchaseEndAt)) throw new Error('The purchase window for this Race Pass has closed.');
   const existing = await RacePass.findOne({ userId: user.id, raceKey });
-  if (existing && existing.status !== 'cancelled') throw new Error('You already have a Race Pass for this race.');
+  if (existing && existing.status !== 'cancelled') {
+    if (paymentRequest?.requestId && existing.paymentRequestId === paymentRequest.requestId) {
+      if (existing.status === 'active') await grantRacePassRole(client, existing);
+      if (existing.status === 'expired') throw new Error('This payment request is already linked to an expired Race Pass.');
+      return { racePass: existing, expiry: existing.expiresAt, membershipName: 'Race Pass' };
+    }
+    throw new Error('You already have a Race Pass for this race.');
+  }
 
   const racePass = await RacePass.create({
     userId: user.id,
