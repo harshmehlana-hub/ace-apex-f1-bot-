@@ -147,6 +147,7 @@ export async function handleFeedbackInteraction(interaction) {
       state.improvement = '';
       return submit(interaction, state);
     }
+    await state.save();
     return interaction.update({
       embeds: [embed('Question 2', '⭐ **How was your experience?**')],
       components: ratingRow(raceKey),
@@ -249,10 +250,6 @@ export default {
         RacePass.find({ guildId: interaction.guildId, status: 'active', expiresAt: { $gt: now } }).select('userId'),
       ]);
       const userIds = new Set([...memberships.map(x => x.userId), ...racePasses.map(x => x.userId)]);
-      let sent = 0;
-      let failed = 0;
-      const failedUsers = [];
-
       const results = await runWithConcurrency([...userIds], async (userId) => {
         const user = await interaction.client.users.fetch(userId);
         if (user.bot) return { skipped: true };
