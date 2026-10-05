@@ -372,10 +372,7 @@ export async function handleFeedbackStatsInteraction(interaction) {
     const race = (await getFeedbackRaces(interaction.guildId)).find(r => r.raceKey === raceKey);
     const responses = await FeedbackResponse.find({ guildId: interaction.guildId, raceKey }).sort({ submittedAt: 1 }).lean();
     if (!race || !responses.length) return interaction.update({ content: '📊 No responses found for that race.', components: [] });
-    const state = { userId: interaction.user.id, raceName: race.raceName, responses, page: 1 };
-    const reply = await interaction.update({ content: null, embeds: [statsEmbed(race.raceName, responses[0], 1, responses.length)], components: statsRows(raceKey, 1, responses.length, interaction.user.id) });
-    statsSessions.set(interaction.message.id, state);
-    return reply;
+    return interaction.update({ content: null, embeds: [statsEmbed(race.raceName, responses[0], 1, responses.length)], components: statsRows(raceKey, 1, responses.length, interaction.user.id) });
   }
 
   if (interaction.customId === ids.prev || interaction.customId === ids.next) {
