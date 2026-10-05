@@ -9,7 +9,7 @@ import { config } from '../config.js';
 import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createPredictionStatisticsEmbed } from '../utils/embeds.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { getCurrentSeason } from './seasonService.js';
-import { processRacePasses } from './racePassService.js';
+import { processRacePasses, cancelRacePassesForRace } from './racePassService.js';
 import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 import { SchedulerLock } from '../database/models/SchedulerLock.js';
@@ -25,6 +25,7 @@ export function setupScheduler(client) {
         processReminders(client),
         processMemberships(client),
         processRacePasses(client),
+        processCancelledRacePasses(client),
         processGoogleSheetSync(client),
         processStalePaymentVerifications(),
       ]);
@@ -251,6 +252,18 @@ async function processReminders(client) {
     } catch (error) {
       await Reminder.updateOne({ _id: reminder._id }, { $set: { sent: false } });
       console.error('Failed to send reminder:', error);
+    }
+  }
+}
+
+
+async function processCancelledRacePasses(client) {
+  const cancelledRaces = await Race.find({ status: 'cancelled' }).select('name season').limit(200).lean();
+  for (const race of cancelledRaces) {
+    try {
+      await cancelRacePassesForRace(client, config.guildId, race.name);
+    } catch (error) {
+      console.error('Failed to reconcile cancelled Race Passes for ' + race.name + ':', error);
     }
   }
 }
