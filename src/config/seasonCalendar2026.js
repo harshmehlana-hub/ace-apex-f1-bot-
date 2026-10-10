@@ -23,6 +23,8 @@ const session = (key, name, qualifying, race, timezone, racePassKey = key) => {
 // converted to absolute instants with the circuit's UTC offset.
 // Sprint sessions are intentionally not included because this bot predicts
 // the main qualifying and Grand Prix only.
+export const SEASON = '2026';
+
 export const SEASON_CALENDAR_2026 = [
   session('australia', 'Australian Grand Prix', '2026-03-07T16:00:00+11:00', '2026-03-08T15:00:00+11:00', 'Australia/Melbourne'),
   session('china', 'Chinese Grand Prix', '2026-03-14T15:00:00+08:00', '2026-03-15T15:00:00+08:00', 'Asia/Shanghai'),
