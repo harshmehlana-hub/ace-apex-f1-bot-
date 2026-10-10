@@ -24,6 +24,7 @@ export default {
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
+    try {
     if (!isAdmin(interaction.member, config.roles.admin)) {
       return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
     }
