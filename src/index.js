@@ -20,6 +20,7 @@ import deleteraceCommand from './commands/deleterace.js';
 import resetseasonCommand from './commands/resetseason.js';
 import adjustpointsCommand from './commands/adjustpoints.js';
 import setqualifyingCommand from './commands/setqualifying.js';
+import extendtimeCommand from './commands/extendtime.js';
 import predictqualifyingCommand from './commands/predictqualifying.js';
 import qualifyingresultCommand from './commands/qualifyingresult.js';
 import deletequalifyingCommand from './commands/deletequalifying.js';
