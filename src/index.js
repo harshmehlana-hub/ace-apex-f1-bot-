@@ -72,6 +72,7 @@ const commands = [
   adjustpointsCommand,
  setqualifyingCommand,
 extendtimeCommand,
+endstageCommand,
 predictqualifyingCommand,
 qualifyingresultCommand,
 deletequalifyingCommand,
