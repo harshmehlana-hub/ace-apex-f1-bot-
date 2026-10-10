@@ -97,8 +97,13 @@ client.on('userUpdate', (oldUser, newUser) => userUpdateEvent.execute(oldUser, n
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  // Only log DMs
+  // Only handle/log DMs
   if (message.guild) return;
+
+  const dmCommand = message.content.trim().toLowerCase();
+  if (dmCommand === '/predict' || dmCommand === '/predictqualifying') {
+    await message.reply('Use the bot commands in server please, Thanks :)').catch(() => {});
+  }
 
 let content = message.content;
 
