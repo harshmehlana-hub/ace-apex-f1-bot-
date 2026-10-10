@@ -70,6 +70,7 @@ const commands = [
   resetseasonCommand,
   adjustpointsCommand,
  setqualifyingCommand,
+extendtimeCommand,
 predictqualifyingCommand,
 qualifyingresultCommand,
 deletequalifyingCommand,
