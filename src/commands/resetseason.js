@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Comp
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { getCurrentSeason, startNewSeason } from '../services/seasonService.js';
+import { getSeasonCalendar } from '../config/seasonCalendar2026.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -19,6 +20,13 @@ export default {
     if (!/^\d{4}$/.test(newSeason)) {
       return interaction.reply({ content: '❌ Season must be a four-digit year.', ephemeral: true });
     }
+    if (getSeasonCalendar(newSeason).length === 0) {
+      return interaction.reply({
+        content: `❌ Season **${newSeason}** has no configured F1 calendar yet. Add the season calendar before switching the active season.`,
+        ephemeral: true,
+      });
+    }
+
     const currentSeason = await getCurrentSeason();
     if (newSeason === currentSeason) {
       return interaction.reply({ content: `❌ ${newSeason} is already the active season.`, ephemeral: true });
