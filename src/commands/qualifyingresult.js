@@ -7,13 +7,15 @@ import { createQualifyingResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { rebuildAllSeasonStandings } from '../services/seasonStandingService.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('qualifyingresult').setDescription('Enter qualifying results (Admin only)').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   async execute(interaction, client) {
     if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
-    const sessions = await Qualifying.find({ status: 'closed' }).sort({ sessionStartTime: 1 });
-    if (!sessions.length) return interaction.reply({ content: '❌ No qualifying sessions are awaiting results.', ephemeral: true });
+    const season = await getCurrentSeason();
+    const sessions = await Qualifying.find({ season, status: 'closed' }).sort({ sessionStartTime: 1 });
+    if (!sessions.length) return interaction.reply({ content: '❌ No qualifying sessions are awaiting results in the active season.', ephemeral: true });
     const menu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('qualifying_session').setPlaceholder('Select qualifying session').addOptions(sessions.slice(0, 25).map(q => ({ label: q.name, description: `Season ${q.season}`, value: String(q._id) }))));
     await interaction.reply({ content: '🏁 Select a qualifying session:', components: [menu], ephemeral: true });
     const response = await interaction.fetchReply();
