@@ -86,9 +86,13 @@ async function updateRaceStatuses(client) {
   for (const race of races) {
     const desired = getTimeStatus(race.predictionOpenTime, race.predictionCloseTime, now);
 
-    if (desired === 'open' && race.status !== 'open') {
-      race.status = 'open';
-      await race.save();
+    if (desired === 'open') {
+      if (race.status !== 'open') {
+        race.status = 'open';
+        await race.save();
+      }
+      // Also attempt the announcement for races already marked open by setup
+      // commands. The atomic claim keeps this safe across scheduler retries.
       await claimAndSendRaceAnnouncement(client, race);
     } else if (desired === 'closed' && race.status === 'open') {
       race.status = 'closed';
@@ -113,9 +117,12 @@ async function updateQualifyingStatuses(client) {
 
   for (const qualifying of sessions) {
     const desired = getTimeStatus(qualifying.predictionOpenTime, qualifying.predictionCloseTime, now);
-    if (desired === 'open' && qualifying.status !== 'open') {
-      qualifying.status = 'open';
-      await qualifying.save();
+    if (desired === 'open') {
+      if (qualifying.status !== 'open') {
+        qualifying.status = 'open';
+        await qualifying.save();
+      }
+      // Catch sessions that were created directly in the open state.
       await claimAndSendQualifyingAnnouncement(client, qualifying);
     } else if (desired === 'closed' && qualifying.status !== 'closed') {
       qualifying.status = 'closed';
