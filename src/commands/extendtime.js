@@ -74,6 +74,17 @@ export default {
         console.error('Failed to log prediction deadline extension:', error);
       }
 
+      try {
+        const announcementsChannel = await client.channels.fetch(config.channels.announcements);
+        if (!announcementsChannel) throw new Error('Prediction announcements channel not found');
+        await announcementsChannel.send({
+          content: '@everyone\\nDue to delayed start the prediction time for ' + session.name + ' is extended by ' + minutes + ' minutes.',
+          allowedMentions: { parse: ['everyone'] },
+        });
+      } catch (error) {
+        console.error('Failed to announce prediction deadline extension:', error);
+      }
+
       return selection.update({
         content: '✅ Extended predictions for **' + session.name + '** by **' + minutes + ' minute(s)**.\n\n' +
           'Previous deadline: <t:' + Math.floor(oldCloseTime.getTime() / 1000) + ':F>\n' +
