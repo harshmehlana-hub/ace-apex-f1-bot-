@@ -22,7 +22,7 @@ export default {
     const now = new Date();
     const [races, sessions] = await Promise.all([
       Race.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
-      Qualifying.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $gt: now } }).sort({ predictionCloseTime: 1 }).limit(25),
+      Qualifying.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
     ]);
 
     const choices = [
@@ -67,8 +67,8 @@ export default {
           '🏁 Session: **' + session.name + '** (' + (type === 'race' ? 'Race' : 'Qualifying') + ')\n' +
           '👤 Admin: <@' + interaction.user.id + '>\n' +
           '➕ Extension: **' + minutes + ' minute(s)**\n' +
-          '🕒 Previous deadline: <t:' + Math.floor(oldCloseTime.getTime() / 1000) + ':F>\n' +
-          '🕒 New deadline: <t:' + Math.floor(session.predictionCloseTime.getTime() / 1000) + ':F>'
+          '🕒 Previous prediction close time: <t:' + Math.floor(oldCloseTime.getTime() / 1000) + ':F>\n' +
+          '🕒 New prediction close time: <t:' + Math.floor(session.predictionCloseTime.getTime() / 1000) + ':F>'
         );
       } catch (error) {
         console.error('Failed to log prediction deadline extension:', error);
@@ -87,8 +87,8 @@ export default {
 
       return selection.update({
         content: '✅ Extended predictions for **' + session.name + '** by **' + minutes + ' minute(s)**.\n\n' +
-          'Previous deadline: <t:' + Math.floor(oldCloseTime.getTime() / 1000) + ':F>\n' +
-          'New deadline: <t:' + Math.floor(session.predictionCloseTime.getTime() / 1000) + ':F>',
+          'Previous prediction close time: <t:' + Math.floor(oldCloseTime.getTime() / 1000) + ':F>\n' +
+          'New prediction close time: <t:' + Math.floor(session.predictionCloseTime.getTime() / 1000) + ':F>',
         components: [],
       });
     } catch (error) {
