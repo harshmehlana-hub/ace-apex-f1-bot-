@@ -78,7 +78,7 @@ export default {
         const announcementsChannel = await client.channels.fetch(config.channels.announcements);
         if (!announcementsChannel) throw new Error('Prediction announcements channel not found');
         await announcementsChannel.send({
-          content: '@everyone\\nDue to delayed start the prediction time for ' + session.name + ' is extended by ' + minutes + ' minutes.',
+          content: '@everyone\nDue to a delayed start, the prediction window for **' + session.name + '** has been extended.\n🕒 **New prediction close time:** <t:' + Math.floor(session.predictionCloseTime.getTime() / 1000) + ':F> (<t:' + Math.floor(session.predictionCloseTime.getTime() / 1000) + ':R>)',
           allowedMentions: { parse: ['everyone'] },
         });
       } catch (error) {
