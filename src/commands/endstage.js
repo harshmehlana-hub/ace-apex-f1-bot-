@@ -4,12 +4,13 @@ import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 
 function parseIstDateTime(value) {
-  const match = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(value.trim());
+  const match = /^(\d{2})-(\d{2})-(\d{4})[ T](\d{2}):(\d{2})$/.exec(value.trim());
   if (!match) return null;
 
-  const [year, month, day, hour, minute] = match.slice(1).map(Number);
+  const [month, day, year, hour, minute] = match.slice(1).map(Number);
   if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
 
+  // The supplied wall-clock time is IST (UTC+05:30); persist the equivalent UTC instant.
   const utcMillis = Date.UTC(year, month - 1, day, hour, minute) - (5 * 60 + 30) * 60_000;
   const check = new Date(utcMillis + (5 * 60 + 30) * 60_000);
   if (
@@ -37,7 +38,7 @@ export default {
     .addStringOption(option =>
       option
         .setName('time_ist')
-        .setDescription('IST time as YYYY-MM-DD HH:mm, e.g. 2026-10-11 19:30')
+        .setDescription('IST time as MM-DD-YYYY HH:MM, e.g. 10-11-2026 19:30')
         .setRequired(true)
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -57,7 +58,7 @@ export default {
 
       if (!scheduledAt) {
         return await interaction.reply({
-          content: '❌ Invalid date/time. Use YYYY-MM-DD HH:mm in IST, for example `2026-10-11 19:30`.',
+          content: '❌ Invalid date/time. Use MM-DD-YYYY HH:MM in IST, for example `10-11-2026 19:30`.',
           ephemeral: true,
         });
       }
