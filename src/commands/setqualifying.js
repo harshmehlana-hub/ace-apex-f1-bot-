@@ -3,7 +3,7 @@ import { Qualifying } from '../database/models/Qualifying.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
-import { getCalendarRace, getCalendarChoices } from '../config/seasonCalendar2026.js';
+import { SEASON, getCalendarRace, getCalendarChoices } from '../config/seasonCalendar2026.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -14,7 +14,7 @@ export default {
         .setName('race')
         .setDescription('Select the Grand Prix')
         .setRequired(true)
-        .addChoices(...getCalendarChoices(new Date().getUTCFullYear()))
+        .addChoices(...getCalendarChoices(SEASON))
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
