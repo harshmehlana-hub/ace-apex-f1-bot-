@@ -74,6 +74,11 @@ export default {
     }
 
     if (interaction.isChatInputCommand()) {
+      if (!interaction.inGuild() && ['predict', 'predictqualifying'].includes(interaction.commandName)) {
+        await interaction.reply({ content: 'Use the bot commands in server please, Thanks :)' }).catch(() => {});
+        return;
+      }
+
       const command = client.commands.get(interaction.commandName);
 
       if (!command) {
