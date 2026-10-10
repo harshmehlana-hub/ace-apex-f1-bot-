@@ -186,6 +186,14 @@ export default {
         submittedAt: new Date(),
       });
 
+      // Count all submitted predictions for this specific race.
+      // Existing predictions are included, so the next log continues from the
+      // current total without changing any historical log messages.
+      const predictionNumber = await Prediction.countDocuments({
+        raceId,
+        season: race.season,
+      });
+
 const standing = await getOrCreateSeasonStanding(interaction.user.id, race.season);
 standing.racePredictionsSubmitted += 1;
 await standing.save();
@@ -209,7 +217,7 @@ await standing.save();
 
         if (logsChannel) {
           await logsChannel.send(
-            ` <@${interaction.user.id}> just submitted their prediction for **${race.name}**.`
+            `🏁 <@${interaction.user.id}> just submitted their prediction for **${race.name}**. #${predictionNumber}`
           );
         }
       } catch (err) {
