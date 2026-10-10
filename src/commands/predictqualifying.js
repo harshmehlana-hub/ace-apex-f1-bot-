@@ -140,6 +140,15 @@ export default {
       });
 
       await prediction.save();
+
+      // Count all submitted predictions for this specific qualifying session.
+      // Existing predictions are included, so the next log continues from the
+      // current total without changing any historical log messages.
+      const predictionNumber = await QualifyingPrediction.countDocuments({
+        qualifyingId: selectedSession._id,
+        season: selectedSession.season,
+      });
+
 const standing = await getOrCreateSeasonStanding(
   interaction.user.id,
   selectedSession.season
@@ -170,7 +179,7 @@ await standing.save();
 
         if (logsChannel) {
           await logsChannel.send(
-            `🏁 <@${interaction.user.id}> submitted a qualifying prediction for **${selectedSession.name}**.`
+            `🏁 <@${interaction.user.id}> submitted a qualifying prediction for **${selectedSession.name}**. #${predictionNumber}`
           );
         }
       } catch (error) {
