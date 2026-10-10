@@ -8,14 +8,16 @@ import { getDriverSelectOptions } from '../utils/drivers.js';
 import { createResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
+import { getCurrentSeason } from '../services/seasonService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('results').setDescription('Enter official race results').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, client) {
     if (!isAdmin(interaction.member, config.roles.admin)) return interaction.reply({ content: '❌ You do not have permission to use this command.', ephemeral: true });
-    const closedRaces = await Race.find({ status: 'closed' }).sort({ raceStartTime: 1 });
-    if (!closedRaces.length) return interaction.reply({ content: '❌ There are no races awaiting results.', ephemeral: true });
+    const season = await getCurrentSeason();
+    const closedRaces = await Race.find({ season, status: 'closed' }).sort({ raceStartTime: 1 });
+    if (!closedRaces.length) return interaction.reply({ content: '❌ There are no races awaiting results in the active season.', ephemeral: true });
 
     const raceMenu = new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId('race_select').setPlaceholder('Select race').addOptions(closedRaces.slice(0, 25).map(r => ({ label: r.name, description: `Season ${r.season}`, value: String(r._id) }))));
     await interaction.reply({ content: '🏁 Select a race:', components: [raceMenu], ephemeral: true });
