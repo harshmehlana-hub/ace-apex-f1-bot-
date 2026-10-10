@@ -3,6 +3,7 @@ import { Season } from '../database/models/Season.js';
 import { Race } from '../database/models/Race.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { config } from '../config.js';
+import { getSeasonCalendar } from '../config/seasonCalendar2026.js';
 
 export async function getCurrentSeason() {
   let season = await Season.findOne({ active: true }).sort({ startedAt: -1 });
@@ -16,6 +17,12 @@ export async function startNewSeason(name) {
   const trimmed = String(name || '').trim();
   if (!/^\d{4}$/.test(trimmed)) {
     throw new Error('Season must be a four-digit year.');
+  }
+
+  // Never activate a season that has no calendar configured. This prevents
+  // an accidental rollover from leaving the bot with no valid race schedule.
+  if (getSeasonCalendar(trimmed).length === 0) {
+    throw new Error(`Season ${trimmed} has no configured calendar.`);
   }
 
   const session = await mongoose.startSession();
