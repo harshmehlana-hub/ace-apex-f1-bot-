@@ -13,6 +13,7 @@ import { processRacePasses, cancelRacePassesForRace } from './racePassService.js
 import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 import { SchedulerLock } from '../database/models/SchedulerLock.js';
+import { StageEndSchedule } from '../database/models/StageEndSchedule.js';
 
 export function setupScheduler(client) {
   const run = async () => {
@@ -28,6 +29,7 @@ export function setupScheduler(client) {
         processCancelledRacePasses(client),
         processGoogleSheetSync(client),
         processStalePaymentVerifications(),
+        processScheduledStageEnds(client),
       ]);
     } finally {
       await releaseSchedulerLock(holder);
@@ -358,6 +360,32 @@ async function processMemberships(client) {
       }
     } catch (error) {
       console.error(`Failed to process membership ${membership._id}:`, error);
+    }
+  }
+}
+
+
+async function processScheduledStageEnds(client) {
+  const due = await StageEndSchedule.find({ status: 'pending', scheduledAt: { $lte: new Date() } }).sort({ scheduledAt: 1 }).limit(20);
+  for (const schedule of due) {
+    const claimed = await StageEndSchedule.findOneAndUpdate(
+      { _id: schedule._id, status: 'pending' },
+      { $set: { status: 'processing' } },
+      { new: true }
+    );
+    if (!claimed) continue;
+    try {
+      // Deleting a Stage Instance ends the live session; it does not delete the voice channel.
+      await client.rest.delete(Routes.stageInstance(claimed.channelId));
+      await StageEndSchedule.updateOne({ _id: claimed._id, status: 'processing' }, { $set: { status: 'completed', lastError: null } });
+      console.log('Ended scheduled Discord Stage session for channel ' + claimed.channelId);
+    } catch (error) {
+      if (error?.status === 404) {
+        await StageEndSchedule.updateOne({ _id: claimed._id, status: 'processing' }, { $set: { status: 'completed', lastError: null } });
+        continue;
+      }
+      await StageEndSchedule.updateOne({ _id: claimed._id, status: 'processing' }, { $set: { status: 'failed', lastError: String(error?.message || error).slice(0, 1000) } });
+      console.error('Failed to end scheduled Discord Stage session:', error);
     }
   }
 }
