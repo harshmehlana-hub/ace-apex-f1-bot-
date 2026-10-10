@@ -21,7 +21,7 @@ export default {
     const season = await getCurrentSeason();
     const now = new Date();
     const [races, sessions] = await Promise.all([
-      Race.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $gt: now } }).sort({ predictionCloseTime: 1 }).limit(25),
+      Race.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
       Qualifying.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $gt: now } }).sort({ predictionCloseTime: 1 }).limit(25),
     ]);
 
@@ -31,14 +31,14 @@ export default {
     ].slice(0, 25);
 
     if (!choices.length) {
-      return interaction.reply({ content: '❌ There are no active race or qualifying prediction sessions to extend right now.', ephemeral: true });
+      return interaction.reply({ content: '❌ There are no race or qualifying sessions with pending results to extend right now.', ephemeral: true });
     }
 
     const customId = 'extendtime:' + interaction.id;
     const row = new ActionRowBuilder().addComponents(
-      new StringSelectMenuBuilder().setCustomId(customId).setPlaceholder('Choose an active prediction session').addOptions(choices)
+      new StringSelectMenuBuilder().setCustomId(customId).setPlaceholder('Choose a session with pending results').addOptions(choices)
     );
-    await interaction.reply({ content: '⏱️ Select the active session to extend by **' + minutes + ' minute(s)**:', components: [row], ephemeral: true });
+    await interaction.reply({ content: '⏱️ Select a session with pending results to extend by **' + minutes + ' minute(s)**:', components: [row], ephemeral: true });
     const response = await interaction.fetchReply();
 
     try {
@@ -51,9 +51,9 @@ export default {
       const Model = type === 'race' ? Race : type === 'qualifying' ? Qualifying : null;
       if (!Model) return selection.update({ content: '❌ Invalid session selection.', components: [] });
 
-      const session = await Model.findOne({ _id: id, season, status: 'open', predictionOpenTime: { $lte: new Date() }, predictionCloseTime: { $gt: new Date() } });
+      const session = await Model.findOne({ _id: id, season, status: 'open', predictionCloseTime: { $lte: new Date() } });
       if (!session) {
-        return selection.update({ content: '❌ That session is no longer active. Run /extendtime again and select an active session.', components: [] });
+        return selection.update({ content: '❌ That session no longer has a closed prediction window with pending results. Run /extendtime again.', components: [] });
       }
 
       const oldCloseTime = new Date(session.predictionCloseTime);
