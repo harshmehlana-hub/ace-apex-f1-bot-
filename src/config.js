@@ -1,4 +1,5 @@
 import dotenv from 'dotenv';
+import { SEASON as CALENDAR_SEASON } from './config/seasonCalendar2026.js';
 dotenv.config();
 
 export const config = {
@@ -13,7 +14,7 @@ export const config = {
   statistics: process.env.STATISTICS_CHANNEL_ID,
   dmLogs: process.env.DM_LOGS_CHANNEL_ID,
 },
-season: process.env.CURRENT_SEASON || String(new Date().getUTCFullYear()),
+season: process.env.CURRENT_SEASON || CALENDAR_SEASON,
   roles: {
   predictor: process.env.PREDICTOR_ROLE_ID,
   admin: process.env.ADMIN_ROLE_ID,
