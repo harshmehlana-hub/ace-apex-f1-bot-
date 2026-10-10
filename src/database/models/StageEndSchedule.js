@@ -5,7 +5,7 @@ const stageEndScheduleSchema = new mongoose.Schema({
   channelId: { type: String, required: true, index: true },
   scheduledAt: { type: Date, required: true, index: true },
   createdBy: { type: String, required: true },
-  status: { type: String, enum: ['pending', 'completed', 'failed', 'cancelled'], default: 'pending', index: true },
+  status: { type: String, enum: ['pending', 'processing', 'completed', 'failed', 'cancelled'], default: 'pending', index: true },
   lastError: { type: String, default: null },
 }, { timestamps: true });
 
