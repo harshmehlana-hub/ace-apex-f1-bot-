@@ -21,8 +21,8 @@ export default {
     const season = await getCurrentSeason();
     const now = new Date();
     const [races, sessions] = await Promise.all([
-      Race.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
-      Qualifying.find({ season, status: 'open', predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
+      Race.find({ season, status: { $in: ['open', 'closed'] }, predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
+      Qualifying.find({ season, status: { $in: ['open', 'closed'] }, predictionOpenTime: { $lte: now }, predictionCloseTime: { $lte: now } }).sort({ predictionCloseTime: 1 }).limit(25),
     ]);
 
     const choices = [
@@ -51,7 +51,7 @@ export default {
       const Model = type === 'race' ? Race : type === 'qualifying' ? Qualifying : null;
       if (!Model) return selection.update({ content: '❌ Invalid session selection.', components: [] });
 
-      const session = await Model.findOne({ _id: id, season, status: 'open', predictionCloseTime: { $lte: new Date() } });
+      const session = await Model.findOne({ _id: id, season, status: { $in: ['open', 'closed'] }, predictionCloseTime: { $lte: new Date() } });
       if (!session) {
         return selection.update({ content: '❌ That session no longer has a closed prediction window with pending results. Run /extendtime again.', components: [] });
       }
