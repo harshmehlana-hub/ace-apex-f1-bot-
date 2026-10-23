@@ -23,7 +23,19 @@ function money(country, sale) {
   return country === 'india' ? '₹' + sale.inrAmount : '$' + sale.usdAmount.toFixed(2);
 }
 
-export async function startSaleSetup(interaction) {
+export async function startSaleSetup(interaction, attachment) {
+  if (!attachment || !/^image\/(png|jpeg|webp)$/i.test(attachment.contentType || '') || attachment.size > 2 * 1024 * 1024) {
+    await interaction.reply({ content: '❌ Attach a PNG, JPG, or WEBP UPI QR image no larger than 2 MB in the /sale command.', ephemeral: true });
+    return;
+  }
+  pendingUploads.set(interaction.user.id, {
+    guildId: interaction.guildId,
+    qrUrl: attachment.url,
+    qrContentType: attachment.contentType || 'image/png',
+    qrFileName: attachment.name || 'upi-qr.png',
+    createdBy: interaction.user.id,
+    expiresAfter: Date.now() + 10 * 60 * 1000,
+  });
   const modal = new ModalBuilder().setCustomId(SETUP_MODAL).setTitle('Configure sale');
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_name').setLabel('Sale name').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setValue('End of Season Pass')),
@@ -79,43 +91,23 @@ export async function handleSaleModal(interaction) {
     await interaction.reply({ content: '❌ Please enter a valid HTTPS PayPal link.', ephemeral: true });
     return true;
   }
-  pendingUploads.set(interaction.user.id, {
-    guildId: interaction.guildId, channelId: interaction.channelId, name, inrAmount, usdAmount,
-    paypalUrl, saleExpiresAt, roleExpiresAt, createdBy: interaction.user.id, expiresAfter: Date.now() + 10 * 60 * 1000,
-  });
-  await interaction.reply({
-    content: '✅ Sale details received. Upload the UPI QR image in this channel within 10 minutes. The new sale replaces the active sale after the image is saved.\n\n**Sale closes:** <t:' + Math.floor(saleExpiresAt.getTime() / 1000) + ':F>\n**Race Pass role expires:** <t:' + Math.floor(roleExpiresAt.getTime() / 1000) + ':F>',
-    ephemeral: true,
-  });
-  return true;
-}
-
-export async function handleSaleUploadMessage(message) {
-  if (!message || message.author?.bot || !message.guild || !message.attachments?.size) return false;
-  const pending = pendingUploads.get(message.author.id);
-  if (!pending || pending.guildId !== message.guild.id || pending.channelId !== message.channel.id) return false;
-  if (Date.now() > pending.expiresAfter) {
-    pendingUploads.delete(message.author.id);
-    await message.reply('⌛ Sale setup expired. Run /sale again.');
+  const pending = pendingUploads.get(interaction.user.id);
+  if (!pending || pending.guildId !== interaction.guildId || Date.now() > pending.expiresAfter) {
+    pendingUploads.delete(interaction.user.id);
+    await interaction.reply({ content: '⌛ Sale setup expired. Run /sale again and attach the QR image.', ephemeral: true });
     return true;
   }
-  if (!isAdmin(message.member, config.roles.admin)) return false;
-  const attachment = message.attachments.find(a => /^image\/(png|jpeg|webp)$/i.test(a.contentType || '') && a.size <= 2 * 1024 * 1024);
-  if (!attachment) {
-    await message.reply('❌ Please attach a PNG, JPG, or WEBP image no larger than 2 MB.');
-    return true;
-  }
+  await interaction.deferReply({ ephemeral: true });
   try {
-    const response = await fetch(attachment.url);
+    const response = await fetch(pending.qrUrl);
     if (!response.ok) throw new Error('Could not download the QR image.');
     const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > 2 * 1024 * 1024) throw new Error('QR image exceeds the 2 MB limit.');
+    if (!buffer.length || buffer.length > 2 * 1024 * 1024) throw new Error('QR image is empty or exceeds the 2 MB limit.');
     const newSale = await SaleConfig.create({
       guildId: pending.guildId,
-      name: pending.name, inrAmount: pending.inrAmount, usdAmount: pending.usdAmount,
-      paypalUrl: pending.paypalUrl, qrBase64: buffer.toString('base64'),
-      qrContentType: attachment.contentType || 'image/png', qrFileName: attachment.name || 'upi-qr.png',
-      expiresAt: pending.saleExpiresAt, roleExpiresAt: pending.roleExpiresAt, active: false, createdBy: pending.createdBy,
+      name, inrAmount, usdAmount, paypalUrl, qrBase64: buffer.toString('base64'),
+      qrContentType: pending.qrContentType, qrFileName: pending.qrFileName,
+      expiresAt: saleExpiresAt, roleExpiresAt, active: false, createdBy: pending.createdBy,
     });
     await SaleConfig.updateMany({ guildId: pending.guildId, active: true }, { $set: { active: false } });
     const activation = await SaleConfig.updateOne({ _id: newSale._id, guildId: pending.guildId }, { $set: { active: true } });
@@ -126,17 +118,17 @@ export async function handleSaleUploadMessage(message) {
       saleExpiresAt: savedSale?.expiresAt, roleExpiresAt: savedSale?.roleExpiresAt,
     });
     if (!savedSale || savedSale.active !== true || String(savedSale.guildId) !== String(pending.guildId)) {
-      throw new Error('Sale saved but failed activation verification. Check sale-debug logs.');
+      throw new Error('Sale saved but failed activation verification.');
     }
-    pendingUploads.delete(message.author.id);
-    await message.reply('✅ **' + pending.name + '** is now active. Users can DM SALE to purchase it. The UPI QR image is saved with the sale.');
-    await message.delete().catch(() => {});
-    return true;
+    pendingUploads.delete(interaction.user.id);
+    await interaction.editReply({
+      content: '✅ **' + name + '** is now active. The QR image was saved from your /sale attachment. Users can DM SALE to purchase it.\n\n**Sale closes:** <t:' + Math.floor(saleExpiresAt.getTime() / 1000) + ':F>\n**Race Pass role expires:** <t:' + Math.floor(roleExpiresAt.getTime() / 1000) + ':F>',
+    });
   } catch (error) {
-    console.error('Failed to save sale QR:', error);
-    await message.reply('❌ I could not save the QR image. Run /sale again and retry.');
-    return true;
+    console.error('Failed to save sale configuration and QR:', error);
+    await interaction.editReply('❌ I could not save the sale or QR image. Check Railway logs and retry /sale.');
   }
+  return true;
 }
 
 export async function startSalePurchase(user) {
