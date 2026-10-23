@@ -14,4 +14,6 @@ const saleConfigSchema = new mongoose.Schema({
   createdBy: { type: String, required: true },
 }, { timestamps: true });
 
+saleConfigSchema.index({ guildId: 1, active: 1 }, { unique: true, partialFilterExpression: { active: true } });
+
 export const SaleConfig = mongoose.model('SaleConfig', saleConfigSchema);
