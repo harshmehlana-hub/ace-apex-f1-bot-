@@ -5,6 +5,7 @@ import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { Membership } from '../database/models/Membership.js';
+import { SaleEntitlement } from '../database/models/SaleEntitlement.js';
 import { config } from '../config.js';
 import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createPredictionStatisticsEmbed } from '../utils/embeds.js';
 import { Prediction } from '../database/models/Prediction.js';
@@ -361,7 +362,7 @@ async function processMemberships(client) {
         if (membership.roleId) {
           // A legacy Race Pass membership must not remove the shared role while a sale pass is still valid.
           const hasSaleAccess = membership.roleId === config.roles.racePass
-            ? await (await import('../database/models/SaleEntitlement.js')).SaleEntitlement.exists({
+            ? await SaleEntitlement.exists({
                 userId: membership.userId, guildId: membership.guildId, status: 'active', expiresAt: { $gt: now },
               })
             : false;
