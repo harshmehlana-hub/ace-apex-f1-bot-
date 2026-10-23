@@ -93,14 +93,15 @@ export async function handleSaleUploadMessage(message) {
     if (!response.ok) throw new Error('Could not download the QR image.');
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.length > 2 * 1024 * 1024) throw new Error('QR image exceeds the 2 MB limit.');
-    await SaleConfig.updateMany({ guildId: pending.guildId, active: true }, { $set: { active: false } });
-    await SaleConfig.create({
+    const newSale = await SaleConfig.create({
       guildId: pending.guildId,
       name: pending.name, inrAmount: pending.inrAmount, usdAmount: pending.usdAmount,
       paypalUrl: pending.paypalUrl, qrBase64: buffer.toString('base64'),
       qrContentType: attachment.contentType || 'image/png', qrFileName: attachment.name || 'upi-qr.png',
-      expiresAt: pending.expiresAt, active: true, createdBy: pending.createdBy,
+      expiresAt: pending.expiresAt, active: false, createdBy: pending.createdBy,
     });
+    await SaleConfig.updateMany({ guildId: pending.guildId, active: true }, { $set: { active: false } });
+    await SaleConfig.updateOne({ _id: newSale._id }, { $set: { active: true } });
     pendingUploads.delete(message.author.id);
     await message.reply('✅ **' + pending.name + '** is now active. Users can DM SALE to purchase it. The UPI QR image is saved with the sale.');
     await message.delete().catch(() => {});
