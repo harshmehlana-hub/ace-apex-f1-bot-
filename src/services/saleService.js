@@ -48,7 +48,7 @@ export async function handleSaleModal(interaction) {
   const saleExpiryInput = interaction.fields.getTextInputValue('sale_expiry').trim();
   const roleExpiryInput = interaction.fields.getTextInputValue('role_expiry').trim();
   const parseIstDateTime = value => {
-    const match = /^(\\d{2})-(\\d{2})-(\\d{4}) (\\d{2}):(\\d{2})$/.exec(value);
+    const match = /^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2})$/.exec(value);
     if (!match) return null;
     const [, dd, mm, yyyy, hh, min] = match;
     const day = Number(dd), month = Number(mm), year = Number(yyyy), hour = Number(hh), minute = Number(min);
