@@ -10,6 +10,7 @@ import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createP
 import { Prediction } from '../database/models/Prediction.js';
 import { getCurrentSeason } from './seasonService.js';
 import { processRacePasses, cancelRacePassesForRace } from './racePassService.js';
+import { processSaleEntitlements } from './saleService.js';
 import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 import { SchedulerLock } from '../database/models/SchedulerLock.js';
@@ -43,6 +44,7 @@ export function setupScheduler(client) {
         ['reminders', () => processReminders(client)],
         ['memberships', () => processMemberships(client)],
         ['Race Passes', () => processRacePasses(client)],
+        ['sale entitlements', () => processSaleEntitlements(client)],
         ['cancelled Race Passes', () => processCancelledRacePasses(client)],
         ['Google Sheets sync', () => processGoogleSheetSync(client)],
         ['stale payment verifications', () => processStalePaymentVerifications()],
