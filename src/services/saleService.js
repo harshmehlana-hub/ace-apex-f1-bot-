@@ -126,8 +126,8 @@ export async function startSalePurchase(user) {
   await user.send({
     content: '## 🏁 ' + sale.name + '\n\nChoose where you are paying from. This sale grants the existing Race Pass role until <t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>.',
     components: [new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(COUNTRY + ':india').setLabel('🇮🇳 India · ₹' + sale.inrAmount).setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId(COUNTRY + ':international').setLabel('🌎 International · $' + sale.usdAmount.toFixed(2)).setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder().setCustomId(COUNTRY + ':india:' + sale._id).setLabel('🇮🇳 India · ₹' + sale.inrAmount).setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId(COUNTRY + ':international:' + sale._id).setLabel('🌎 International · $' + sale.usdAmount.toFixed(2)).setStyle(ButtonStyle.Secondary),
     )],
   });
 }
@@ -135,9 +135,9 @@ export async function startSalePurchase(user) {
 export async function handleSaleInteraction(interaction) {
   const id = interaction.customId || '';
   if (id.startsWith(COUNTRY + ':')) {
-    const country = id.split(':')[2];
+    const [, , country, saleId] = id.split(':');
     if (!['india', 'international'].includes(country)) return true;
-    const sale = await SaleConfig.findOne({ guildId: config.guildId, active: true, expiresAt: { $gt: new Date() } }).lean();
+    const sale = await SaleConfig.findOne({ _id: saleId, guildId: config.guildId, expiresAt: { $gt: new Date() } }).lean();
     if (!sale) return interaction.update({ content: '🏁 This sale is no longer active.', components: [] });
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(PAID + ':' + country + ':' + sale._id).setLabel('I have paid').setStyle(ButtonStyle.Success)
