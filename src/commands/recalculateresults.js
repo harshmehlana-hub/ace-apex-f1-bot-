@@ -20,18 +20,18 @@ export default {
     const response = await interaction.fetchReply();
 
     try {
-      const raceI = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const raceI = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const race = races.find(r => String(r._id) === raceI.values[0]);
       const oldResult = await Result.findOne({ raceId: race._id });
       if (!oldResult) return raceI.update({ content: '❌ No result exists for this race.', components: [] });
       const drivers = getDriverSelectOptions();
       const menuFor = (id, placeholder, excluded = []) => new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(id).setPlaceholder(placeholder).addOptions(drivers.filter(d => !excluded.includes(d.value))));
       await raceI.update({ content: `🔄 **${race.name}**\nCurrent: ${oldResult.p1Driver} / ${oldResult.p2Driver} / ${oldResult.p3Driver}\n\nSelect new P1`, components: [menuFor('p1', 'New P1')] });
-      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 }); const p1 = p1I.values[0];
+      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id }); const p1 = p1I.values[0];
       await p1I.update({ content: `🥇 P1: ${p1}\n\nSelect new P2`, components: [menuFor('p2', 'New P2', [p1])] });
-      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 }); const p2 = p2I.values[0];
+      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id }); const p2 = p2I.values[0];
       await p2I.update({ content: `🥇 P1: ${p1}\n🥈 P2: ${p2}\n\nSelect new P3`, components: [menuFor('p3', 'New P3', [p1, p2])] });
-      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 }); const p3 = p3I.values[0];
+      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id }); const p3 = p3I.values[0];
       const newResult = { p1Driver: p1, p2Driver: p2, p3Driver: p3 };
       await p3I.deferUpdate();
 
@@ -48,10 +48,24 @@ export default {
         return { scores: recalculated, topIds: recalculatedTopIds };
       });
 
-      await rebuildAllSeasonStandings(race.season);
-      await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topIds);
+      let standingsSynced = true;
+      try {
+        await rebuildAllSeasonStandings(race.season);
+      } catch (error) {
+        standingsSynced = false;
+        console.error('Corrected race standings reconciliation failed:', error);
+      }
 
-      await p3I.editReply({ content: `✅ **${race.name}** recalculated successfully.\n\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 All season standings and Predictor of the Week roles were reconciled.`, components: [] });
+      try {
+        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topIds);
+      } catch (error) {
+        console.error('Predictor of the Week role reconciliation failed:', error);
+      }
+
+      const standingsMessage = standingsSynced
+        ? '📊 Season standings were updated.'
+        : '⚠️ IMPORTANT: The corrected result and scoring were saved, but the leaderboard update failed. Do not rely on the leaderboard until an administrator retries the standings update.';
+      await p3I.editReply({ content: `✅ **${race.name}** result correction saved.\n\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n${standingsMessage}`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Selection timed out.', components: [] });

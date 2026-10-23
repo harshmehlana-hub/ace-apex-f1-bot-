@@ -24,7 +24,7 @@ export default {
     const response = await interaction.fetchReply();
 
     try {
-      const raceInteraction = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const raceInteraction = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const race = closedRaces.find(r => String(r._id) === raceInteraction.values[0]);
       if (!race) return raceInteraction.update({ content: '❌ Race not found.', components: [] });
       if (await Result.exists({ raceId: race._id })) return raceInteraction.update({ content: '❌ This race already has a result. Use `/recalculateresults` to correct it.', components: [] });
@@ -32,13 +32,13 @@ export default {
       const drivers = getDriverSelectOptions();
       const makeMenu = (id, placeholder, excluded = []) => new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(id).setPlaceholder(placeholder).addOptions(drivers.filter(d => !excluded.includes(d.value))));
       await raceInteraction.update({ content: `🏁 ${race.name}\n\n🥇 Select Official P1`, components: [makeMenu('p1', 'Select Official P1')] });
-      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const p1 = p1I.values[0];
       await p1I.update({ content: `🏁 ${race.name}\n🥇 P1: ${p1}\n\n🥈 Select Official P2`, components: [makeMenu('p2', 'Select Official P2', [p1])] });
-      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const p2 = p2I.values[0];
       await p2I.update({ content: `🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n\n🥉 Select Official P3`, components: [makeMenu('p3', 'Select Official P3', [p1, p2])] });
-      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const p3 = p3I.values[0];
 
       // Acknowledge the component immediately because scoring, standings,
@@ -82,14 +82,24 @@ export default {
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scores)] });
       } catch (error) { console.error('Failed to publish race results:', error); }
 
+      let standingsSynced = true;
       try {
         await rebuildAllSeasonStandings(race.season);
-        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
       } catch (error) {
-        console.error('Race result post-processing failed:', error);
+        standingsSynced = false;
+        console.error('Race result standings reconciliation failed:', error);
       }
 
-      await p3I.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.`, components: [] });
+      try {
+        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
+      } catch (error) {
+        console.error('Predictor of the Week role reconciliation failed:', error);
+      }
+
+      const standingsMessage = standingsSynced
+        ? '📊 Season standings were updated.'
+        : '⚠️ IMPORTANT: Race scoring was saved, but the leaderboard update failed. Do not rely on the leaderboard until an administrator retries the standings update.';
+      await p3I.editReply({ content: `✅ Race scoring completed.\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.\n\n${standingsMessage}`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Results entry timed out.', components: [] });

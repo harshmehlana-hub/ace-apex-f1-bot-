@@ -19,19 +19,43 @@ export function setupScheduler(client) {
   const run = async () => {
     const holder = await acquireSchedulerLock();
     if (!holder) return;
+    // Renew the lease while work is in progress so a slow cycle does not
+    // allow another bot instance to start the same scheduled work.
+    const renewal = setInterval(async () => {
+      try {
+        const result = await SchedulerLock.updateOne(
+          { _id: 'global', holder },
+          { $set: { expiresAt: new Date(Date.now() + 90 * 1000) } }
+        );
+        if (result.modifiedCount !== 1) {
+          console.error('[Scheduler] Lock lease was lost while tasks were running.');
+        }
+      } catch (error) {
+        console.error('[Scheduler] Failed to renew lock lease:', error);
+      }
+    }, 30 * 1000);
+    renewal.unref?.();
+
     try {
-      await Promise.allSettled([
-        updateRaceStatuses(client),
-        updateQualifyingStatuses(client),
-        processReminders(client),
-        processMemberships(client),
-        processRacePasses(client),
-        processCancelledRacePasses(client),
-        processGoogleSheetSync(client),
-        processStalePaymentVerifications(),
-        processScheduledStageEnds(client),
-      ]);
+      const tasks = [
+        ['race statuses', () => updateRaceStatuses(client)],
+        ['qualifying statuses', () => updateQualifyingStatuses(client)],
+        ['reminders', () => processReminders(client)],
+        ['memberships', () => processMemberships(client)],
+        ['Race Passes', () => processRacePasses(client)],
+        ['cancelled Race Passes', () => processCancelledRacePasses(client)],
+        ['Google Sheets sync', () => processGoogleSheetSync(client)],
+        ['stale payment verifications', () => processStalePaymentVerifications()],
+        ['scheduled stage ends', () => processScheduledStageEnds(client)],
+      ];
+      const outcomes = await Promise.allSettled(tasks.map(([, task]) => task()));
+      outcomes.forEach((outcome, index) => {
+        if (outcome.status === 'rejected') {
+          console.error(`[Scheduler] Task "${tasks[index][0]}" failed:`, outcome.reason);
+        }
+      });
     } finally {
+      clearInterval(renewal);
       await releaseSchedulerLock(holder);
     }
   };

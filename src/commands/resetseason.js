@@ -42,16 +42,22 @@ export default {
     });
 
     try {
-      const confirm = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 30000 });
+      const confirm = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 30000, filter: i => i.user.id === interaction.user.id });
       if (confirm.customId === 'cancel_reset') return confirm.update({ content: '❌ Season switch cancelled.', components: [] });
+      if (confirm.customId !== 'confirm_reset' || !isAdmin(confirm.member, config.roles.admin)) {
+        return confirm.update({ content: '❌ Confirmation rejected. An authorized administrator must confirm the season switch.', components: [] });
+      }
 
       const finalRow = new ActionRowBuilder().addComponents(
         new ButtonBuilder().setCustomId('final_confirm').setLabel('CONFIRM SEASON SWITCH').setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId('final_cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary)
       );
       await confirm.update({ content: `🚨 **FINAL CONFIRMATION**\n\nSwitch active season from **${currentSeason}** to **${newSeason}**?`, components: [finalRow] });
-      const final = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 15000 });
+      const final = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 15000, filter: i => i.user.id === interaction.user.id });
       if (final.customId === 'final_cancel') return final.update({ content: '❌ Season switch cancelled.', components: [] });
+      if (final.customId !== 'final_confirm' || !isAdmin(final.member, config.roles.admin)) {
+        return final.update({ content: '❌ Final confirmation rejected. An authorized administrator must confirm the season switch.', components: [] });
+      }
 
       await startNewSeason(newSeason);
       await final.update({ content: `✅ **Season ${newSeason} is now active.**\n\nHistorical season data was not reset or deleted.`, components: [] });
