@@ -9,7 +9,6 @@ import { SaleEntitlement } from '../database/models/SaleEntitlement.js';
 import { RacePass } from '../database/models/RacePass.js';
 import { Membership } from '../database/models/Membership.js';
 import { config } from '../config.js';
-import { getAllRacePasses } from '../config/racePasses2026.js';
 import { isAdmin } from '../utils/validators.js';
 
 const SETUP_MODAL = 'sale:setup-modal';
@@ -24,19 +23,14 @@ function money(country, sale) {
   return country === 'india' ? '₹' + sale.inrAmount : '$' + sale.usdAmount.toFixed(2);
 }
 
-function finalRacePassExpiry() {
-  const passes = getAllRacePasses();
-  if (!passes.length) throw new Error('No season Race Pass calendar is configured.');
-  return passes[passes.length - 1].expiryAt;
-}
-
 export async function startSaleSetup(interaction) {
   const modal = new ModalBuilder().setCustomId(SETUP_MODAL).setTitle('Configure sale');
   modal.addComponents(
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_name').setLabel('Sale name').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setValue('End of Season Pass')),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('inr_price').setLabel('India price in INR (e.g. 99)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(12).setValue('99')),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('usd_price').setLabel('International price in USD (e.g. 4.99)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(12).setValue('4.99')),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('paypal_url').setLabel('PayPal payment link').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(500).setPlaceholder('https://...'))
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('prices').setLabel('Prices: INR, USD (e.g. 99, 4.99)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setValue('99, 4.99')),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('paypal_url').setLabel('PayPal payment link').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(500).setPlaceholder('https://...')),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_expiry').setLabel('Sale expiry (UTC ISO, e.g. 2026-11-15T18:30:00Z)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-11-15T18:30:00Z')),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('role_expiry').setLabel('Race Pass role expiry (UTC ISO)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-12-07T00:00:00Z'))
   );
   await interaction.showModal(modal);
 }
@@ -48,11 +42,24 @@ export async function handleSaleModal(interaction) {
     return true;
   }
   const name = interaction.fields.getTextInputValue('sale_name').trim();
-  const inrAmount = Number(interaction.fields.getTextInputValue('inr_price').trim());
-  const usdAmount = Number(interaction.fields.getTextInputValue('usd_price').trim());
+  const priceParts = interaction.fields.getTextInputValue('prices').split(',').map(value => Number(value.trim()));
+  const [inrAmount, usdAmount] = priceParts;
   const paypalUrl = interaction.fields.getTextInputValue('paypal_url').trim();
-  if (!name || !Number.isFinite(inrAmount) || inrAmount <= 0 || !Number.isFinite(usdAmount) || usdAmount <= 0) {
-    await interaction.reply({ content: '❌ Enter a sale name and valid positive prices.', ephemeral: true });
+  const saleExpiryInput = interaction.fields.getTextInputValue('sale_expiry').trim();
+  const roleExpiryInput = interaction.fields.getTextInputValue('role_expiry').trim();
+  const saleExpiresAt = new Date(saleExpiryInput);
+  const roleExpiresAt = new Date(roleExpiryInput);
+  if (!name || priceParts.length !== 2 || !Number.isFinite(inrAmount) || inrAmount <= 0 || !Number.isFinite(usdAmount) || usdAmount <= 0) {
+    await interaction.reply({ content: '❌ Enter a sale name and valid prices as `INR, USD` (for example `99, 4.99`).', ephemeral: true });
+    return true;
+  }
+  const hasTimezone = value => /(Z|[+-]\\d{2}:?\\d{2})$/i.test(value);
+  if (Number.isNaN(saleExpiresAt.getTime()) || Number.isNaN(roleExpiresAt.getTime()) || !hasTimezone(saleExpiryInput) || !hasTimezone(roleExpiryInput)) {
+    await interaction.reply({ content: '❌ Enter both dates as ISO date/time with timezone, e.g. `2026-11-15T18:30:00Z` (UTC).', ephemeral: true });
+    return true;
+  }
+  if (saleExpiresAt <= new Date() || roleExpiresAt <= new Date() || roleExpiresAt < saleExpiresAt) {
+    await interaction.reply({ content: '❌ Both dates must be in the future, and Race Pass role expiry must be on or after sale expiry.', ephemeral: true });
     return true;
   }
   let parsedUrl;
@@ -61,13 +68,12 @@ export async function handleSaleModal(interaction) {
     await interaction.reply({ content: '❌ Please enter a valid HTTPS PayPal link.', ephemeral: true });
     return true;
   }
-  const expiresAt = finalRacePassExpiry();
   pendingUploads.set(interaction.user.id, {
     guildId: interaction.guildId, channelId: interaction.channelId, name, inrAmount, usdAmount,
-    paypalUrl, expiresAt, createdBy: interaction.user.id, expiresAfter: Date.now() + 10 * 60 * 1000,
+    paypalUrl, saleExpiresAt, roleExpiresAt, createdBy: interaction.user.id, expiresAfter: Date.now() + 10 * 60 * 1000,
   });
   await interaction.reply({
-    content: '✅ Sale details received. Now upload the UPI QR image as an attachment in this channel within 10 minutes. The new sale replaces the currently active sale after the image is saved.\n\nExpiry is automatically set to <t:' + Math.floor(expiresAt.getTime() / 1000) + ':F>, matching the final regular Race Pass.',
+    content: '✅ Sale details received. Upload the UPI QR image in this channel within 10 minutes. The new sale replaces the active sale after the image is saved.\n\n**Sale closes:** <t:' + Math.floor(saleExpiresAt.getTime() / 1000) + ':F>\n**Race Pass role expires:** <t:' + Math.floor(roleExpiresAt.getTime() / 1000) + ':F>',
     ephemeral: true,
   });
   return true;
@@ -98,7 +104,7 @@ export async function handleSaleUploadMessage(message) {
       name: pending.name, inrAmount: pending.inrAmount, usdAmount: pending.usdAmount,
       paypalUrl: pending.paypalUrl, qrBase64: buffer.toString('base64'),
       qrContentType: attachment.contentType || 'image/png', qrFileName: attachment.name || 'upi-qr.png',
-      expiresAt: pending.expiresAt, active: false, createdBy: pending.createdBy,
+      expiresAt: pending.saleExpiresAt, roleExpiresAt: pending.roleExpiresAt, active: false, createdBy: pending.createdBy,
     });
     await SaleConfig.updateMany({ guildId: pending.guildId, active: true }, { $set: { active: false } });
     await SaleConfig.updateOne({ _id: newSale._id }, { $set: { active: true } });
@@ -125,7 +131,7 @@ export async function startSalePurchase(user) {
     return;
   }
   await user.send({
-    content: '## 🏁 ' + sale.name + '\n\nChoose where you are paying from. This sale grants the existing Race Pass role until <t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>.',
+    content: '## 🏁 ' + sale.name + '\n\nChoose where you are paying from. This sale accepts new purchases until <t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>. Verified buyers keep the Race Pass role until <t:' + Math.floor(new Date(sale.roleExpiresAt || sale.expiresAt).getTime() / 1000) + ':F>.',
     components: [new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId(COUNTRY + ':india:' + sale._id).setLabel('🇮🇳 India · ₹' + sale.inrAmount).setStyle(ButtonStyle.Primary),
       new ButtonBuilder().setCustomId(COUNTRY + ':international:' + sale._id).setLabel('🌎 International · $' + sale.usdAmount.toFixed(2)).setStyle(ButtonStyle.Secondary),
@@ -145,7 +151,8 @@ export async function handleSaleInteraction(interaction) {
     );
     if (country === 'international') row.addComponents(new ButtonBuilder().setLabel('Pay with PayPal').setStyle(ButtonStyle.Link).setURL(sale.paypalUrl));
     const content = '## ' + sale.name + '\n\n**Price:** ' + money(country, sale) +
-      '\n**Access expires:** <t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>\n\n' +
+      '\n**Sale closes:** <t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>' +
+      '\n**Race Pass role expires:** <t:' + Math.floor(new Date(sale.roleExpiresAt || sale.expiresAt).getTime() / 1000) + ':F>\n\n' +
       (country === 'india'
         ? 'Scan the UPI QR below, complete payment, then click I have paid and enter the payer name.'
         : 'Click Pay with PayPal, complete payment, then click I have paid and enter the payer name.') +
@@ -184,7 +191,7 @@ export async function handleSalePaymentModal(interaction, client) {
   const currency = country === 'india' ? 'INR' : 'USD';
   const request = await PaymentVerification.create({
     requestId: randomUUID(), userId: interaction.user.id, guildId: config.guildId, country,
-    type: 'sale', saleName: sale.name, saleExpiresAt: sale.expiresAt, saleConfigId: sale._id.toString(),
+    type: 'sale', saleName: sale.name, saleExpiresAt: sale.expiresAt, saleRoleExpiresAt: sale.roleExpiresAt || sale.expiresAt, saleConfigId: sale._id.toString(),
     amount, currency, payerName, status: 'pending',
   });
   try {
@@ -196,7 +203,8 @@ export async function handleSalePaymentModal(interaction, client) {
       { name: '💰 Amount', value: money(country, sale), inline: true },
       { name: '🌍 Payment region', value: country === 'india' ? 'India / UPI' : 'International / PayPal', inline: true },
       { name: '🧾 Payer name', value: payerName, inline: true },
-      { name: '⏰ Access expires', value: '<t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>', inline: true },
+      { name: '🛒 Sale closes', value: '<t:' + Math.floor(new Date(sale.expiresAt).getTime() / 1000) + ':F>', inline: true },
+      { name: '⏰ Role expires', value: '<t:' + Math.floor(new Date(sale.roleExpiresAt || sale.expiresAt).getTime() / 1000) + ':F>', inline: true },
       { name: '🆔 Request ID', value: request.requestId, inline: true },
     ).setFooter({ text: 'Payment is NOT verified yet. Check the actual transaction before granting access.' });
     await channel.send({ embeds: [embed], components: [new ActionRowBuilder().addComponents(
@@ -226,7 +234,7 @@ export async function handleSalePaymentModal(interaction, client) {
 }
 
 export async function grantSaleEntitlement({ client, guild, user, paymentRequest }) {
-  const expiry = new Date(paymentRequest.saleExpiresAt);
+  const expiry = new Date(paymentRequest.saleRoleExpiresAt || paymentRequest.saleExpiresAt);
   if (!paymentRequest.saleExpiresAt || expiry <= new Date()) throw new Error('This sale access period has expired.');
   let entitlement = await SaleEntitlement.findOne({ requestId: paymentRequest.requestId });
   if (entitlement && (entitlement.status !== 'active' || entitlement.expiresAt <= new Date())) throw new Error('This sale entitlement has already expired.');
