@@ -38,6 +38,7 @@ import announcementCommand from './commands/announcement.js';
 import feedbackCommand from './commands/feedback.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
+import { startPurchase } from './services/purchaseMembershipService.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -49,10 +50,7 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.DirectMessages,
   ],
-
-  partials: [
-    Partials.Channel,
-  ],
+  partials: [Partials.Channel],
 });
 
 // Initialize commands collection
@@ -70,20 +68,20 @@ const commands = [
   deleteraceCommand,
   resetseasonCommand,
   adjustpointsCommand,
- setqualifyingCommand,
-extendtimeCommand,
-endstageCommand,
-predictqualifyingCommand,
-qualifyingresultCommand,
-deletequalifyingCommand,
-predictionstatsCommand,
-remindCommand,
-recalculatequalifyingCommand,
-grantmembershipCommand,
-membershipinfoCommand,
-deletemembershipCommand,
-privacyCommand,
-dmCommand,
+  setqualifyingCommand,
+  extendtimeCommand,
+  endstageCommand,
+  predictqualifyingCommand,
+  qualifyingresultCommand,
+  deletequalifyingCommand,
+  predictionstatsCommand,
+  remindCommand,
+  recalculatequalifyingCommand,
+  grantmembershipCommand,
+  membershipinfoCommand,
+  deletemembershipCommand,
+  privacyCommand,
+  dmCommand,
   purchasemembershipCommand,
   announcementCommand,
   feedbackCommand,
@@ -105,55 +103,55 @@ client.on('messageCreate', async (message) => {
   if (message.guild) return;
 
   const dmCommand = message.content.trim().toLowerCase();
+
   if (dmCommand === '/predict' || dmCommand === '/predictqualifying') {
     await message.reply('Use the bot commands in server please, Thanks :)').catch(() => {});
+  } else if (dmCommand === '/purchasemembership') {
+    // Reuse the same purchase flow as the slash command, adapted for a text DM.
+    await startPurchase({
+      user: message.author,
+      reply: async (options) => {
+        const { ephemeral, ...messageOptions } = options || {};
+        return message.reply(messageOptions);
+      },
+    }, client).catch((error) => {
+      console.error('Failed to handle /purchasemembership DM text command:', error);
+      message.reply('❌ Something went wrong starting the membership purchase. Please try again.').catch(() => {});
+    });
   }
 
-let content = message.content;
+  let content = message.content;
 
-if (message.attachments.size > 0) {
-  const attachments = message.attachments
-    .map(a => a.url)
-    .join('\n');
+  if (message.attachments.size > 0) {
+    const attachments = message.attachments.map(a => a.url).join('\n');
+    content += (content ? '\n\n' : '') + `📎 Attachments:\n${attachments}`;
+  }
 
-  content +=
-    (content ? '\n\n' : '') +
-    `📎 Attachments:\n${attachments}`;
-}
+  if (!content) {
+    content = '*No text message*';
+  }
 
-if (!content) {
-  content = '*No text message*';
-}
-
-await logDM(
-  client,
-  'Incoming DM',
-  null,
-  message.author,
-  content
-);
+  await logDM(client, 'Incoming DM', null, message.author, content);
 });
 
 // Start the bot
 async function main() {
   try {
-    console.log("MONGODB_URI:", process.env.MONGODB_URI ? "FOUND" : "NOT FOUND");
+    console.log('MONGODB_URI:', process.env.MONGODB_URI ? 'FOUND' : 'NOT FOUND');
 
     await connectDatabase();
     console.log('Connected to MongoDB');
     await runDataMigrations();
     console.log('Database integrity migration completed');
 
-console.log("DISCORD_TOKEN:", process.env.DISCORD_TOKEN ? "FOUND" : "NOT FOUND");
-console.log("config.token exists:", !!config.token);
-console.log("Attempting Discord login..."); 
+    console.log('DISCORD_TOKEN:', process.env.DISCORD_TOKEN ? 'FOUND' : 'NOT FOUND');
+    console.log('config.token exists:', !!config.token);
+    console.log('Attempting Discord login...');
     await client.login(config.token);
-   
+
     process.on('exit', (code) => {
-  console.log('PROCESS EXITED WITH CODE:', code);
-});
-    
-    
+      console.log('PROCESS EXITED WITH CODE:', code);
+    });
   } catch (error) {
     console.error('Failed to start bot:', error);
     process.exit(1);
