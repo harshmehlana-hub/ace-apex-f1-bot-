@@ -29,8 +29,8 @@ export async function startSaleSetup(interaction) {
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_name').setLabel('Sale name').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setValue('End of Season Pass')),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('prices').setLabel('Prices: INR, USD (e.g. 99, 4.99)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setValue('99, 4.99')),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('paypal_url').setLabel('PayPal payment link').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(500).setPlaceholder('https://...')),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_expiry').setLabel('Sale closes (UTC)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-11-15T18:30:00Z')),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('role_expiry').setLabel('Race Pass role expiry (UTC ISO)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-12-07T00:00:00Z'))
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_expiry').setLabel('Sale closes (DD-MM-YYYY HH:mm IST)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(16).setPlaceholder('15-11-2026 23:59')),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('role_expiry').setLabel('Role expiry (DD-MM-YYYY HH:mm IST)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(16).setPlaceholder('07-12-2026 00:00'))
   );
   await interaction.showModal(modal);
 }
@@ -47,15 +47,26 @@ export async function handleSaleModal(interaction) {
   const paypalUrl = interaction.fields.getTextInputValue('paypal_url').trim();
   const saleExpiryInput = interaction.fields.getTextInputValue('sale_expiry').trim();
   const roleExpiryInput = interaction.fields.getTextInputValue('role_expiry').trim();
-  const saleExpiresAt = new Date(saleExpiryInput);
-  const roleExpiresAt = new Date(roleExpiryInput);
+  const parseIstDateTime = value => {
+    const match = /^(\\d{2})-(\\d{2})-(\\d{4}) (\\d{2}):(\\d{2})$/.exec(value);
+    if (!match) return null;
+    const [, dd, mm, yyyy, hh, min] = match;
+    const day = Number(dd), month = Number(mm), year = Number(yyyy), hour = Number(hh), minute = Number(min);
+    if (month < 1 || month > 12 || day < 1 || hour > 23 || minute > 59) return null;
+    const utcMs = Date.UTC(year, month - 1, day, hour, minute) - (5 * 60 + 30) * 60 * 1000;
+    const date = new Date(utcMs);
+    const ist = new Date(utcMs + (5 * 60 + 30) * 60 * 1000);
+    if (ist.getUTCFullYear() !== year || ist.getUTCMonth() !== month - 1 || ist.getUTCDate() !== day || ist.getUTCHours() !== hour || ist.getUTCMinutes() !== minute) return null;
+    return date;
+  };
+  const saleExpiresAt = parseIstDateTime(saleExpiryInput);
+  const roleExpiresAt = parseIstDateTime(roleExpiryInput);
   if (!name || priceParts.length !== 2 || !Number.isFinite(inrAmount) || inrAmount <= 0 || !Number.isFinite(usdAmount) || usdAmount <= 0) {
     await interaction.reply({ content: '❌ Enter a sale name and valid prices as `INR, USD` (for example `99, 4.99`).', ephemeral: true });
     return true;
   }
-  const hasTimezone = value => value.endsWith('Z');
-  if (Number.isNaN(saleExpiresAt.getTime()) || Number.isNaN(roleExpiresAt.getTime()) || !hasTimezone(saleExpiryInput) || !hasTimezone(roleExpiryInput)) {
-    await interaction.reply({ content: '❌ Enter both dates as ISO date/time with timezone, e.g. `2026-11-15T18:30:00Z` (UTC).', ephemeral: true });
+  if (!saleExpiresAt || !roleExpiresAt) {
+    await interaction.reply({ content: '❌ Enter both dates in `DD-MM-YYYY HH:mm` format using IST (24-hour time), e.g. `15-11-2026 23:59`. Make sure the date and time are valid.', ephemeral: true });
     return true;
   }
   if (saleExpiresAt <= new Date() || roleExpiresAt <= new Date() || roleExpiresAt < saleExpiresAt) {
