@@ -17,6 +17,7 @@ import { getAvailableRacePasses, getRacePass } from '../config/racePasses2026.js
 import { grantMembership, MEMBERSHIP_DETAILS } from './membershipService.js';
 import { createRacePass } from './racePassService.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
+import { grantSaleEntitlement } from './saleService.js';
 
 const COUNTRY_PREFIX = 'purchase_country';
 const TYPE_PREFIX = 'purchase_type';
@@ -280,7 +281,9 @@ async function verifyPayment(interaction, client, requestId) {
 
   try {
     user = await client.users.fetch(request.userId);
-    if (request.type === 'race') {
+    if (request.type === 'sale') {
+      result = await grantSaleEntitlement({ client, guild: interaction.guild, user, paymentRequest: request });
+    } else if (request.type === 'race') {
       result = await createRacePass({ client, guild: interaction.guild, user, paymentRequest: request, raceKey: request.raceKey });
     } else {
       result = await grantMembership({ client, guild: interaction.guild, user, type: request.type, grantedBy: interaction.user, source: 'Manual payment verification', paymentRequest: request });
@@ -290,7 +293,8 @@ async function verifyPayment(interaction, client, requestId) {
     request.verifiedAt = new Date();
     request.processingAt = null;
     await request.save();
-    await syncVerifiedPaymentToSheet(request, user);
+    // Sale payments intentionally stay out of the existing membership Google Sheet.
+    if (request.type !== 'sale') await syncVerifiedPaymentToSheet(request, user);
   } catch (error) {
     await PaymentVerification.updateOne(
       { _id: request._id, status: 'processing' },
@@ -342,7 +346,8 @@ async function rejectPayment(interaction, client, requestId) {
 
   try {
     const user = await client.users.fetch(request.userId);
-    await user.send('❌ Your ' + MEMBERSHIP_DETAILS[request.type].name + ' payment could not be verified, so no membership was granted. If you believe this was a mistake, please contact the Ace\'s Apex team.');
+    const itemName = request.type === 'sale' ? (request.saleName || 'sale') : MEMBERSHIP_DETAILS[request.type].name;
+    await user.send('❌ Your ' + itemName + ' payment could not be verified, so no access was granted. If you believe this was a mistake, please contact the Ace\'s Apex team.');
   } catch (error) {
     console.error('Failed to notify rejected payment user:', error);
   }
@@ -350,7 +355,7 @@ async function rejectPayment(interaction, client, requestId) {
   await interaction.message.edit({
     embeds: [new EmbedBuilder().setColor(0xe74c3c).setTitle('❌ Membership Payment Rejected').setTimestamp().addFields(
       { name: '👤 User', value: '<@' + request.userId + '>\n`' + request.userId + '`', inline: true },
-      { name: '🎟️ Membership', value: MEMBERSHIP_DETAILS[request.type].name, inline: true },
+      { name: '🎟️ Membership', value: request.type === 'sale' ? (request.saleName || 'Sale Pass') : MEMBERSHIP_DETAILS[request.type].name, inline: true },
       { name: '💰 Amount', value: request.currency + ' ' + request.amount, inline: true },
       { name: '🧾 Payer name', value: request.payerName, inline: true },
       { name: '👮 Rejected by', value: interaction.user.tag, inline: true },
