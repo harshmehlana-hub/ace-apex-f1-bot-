@@ -26,6 +26,7 @@ import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
+import saleCommand from './commands/sale.js';
 import announcementCommand from './commands/announcement.js';
 import feedbackCommand from './commands/feedback.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
@@ -56,6 +57,7 @@ const commands = [
   privacyCommand.data.toJSON(),
   dmCommand.data.toJSON(),
   purchasemembershipCommand.data.toJSON(),
+  saleCommand.data.toJSON(),
   announcementCommand.data.toJSON(),
   feedbackCommand.data.toJSON(),
   feedbackStatsCommand.data.toJSON(),
