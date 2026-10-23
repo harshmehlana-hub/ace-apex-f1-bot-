@@ -34,6 +34,7 @@ const paymentVerificationSchema = new mongoose.Schema({
   },
   saleName: { type: String, default: null },
   saleExpiresAt: { type: Date, default: null },
+  saleRoleExpiresAt: { type: Date, default: null },
   saleConfigId: { type: String, default: null },
   amount: {
     type: Number,
