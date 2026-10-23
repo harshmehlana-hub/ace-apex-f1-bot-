@@ -40,7 +40,7 @@ import feedbackCommand from './commands/feedback.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
 import { startPurchase } from './services/purchaseMembershipService.js';
-import { startSalePurchase, handleSaleUploadMessage } from './services/saleService.js';
+import { startSalePurchase } from './services/saleService.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -103,10 +103,7 @@ client.on('userUpdate', (oldUser, newUser) => userUpdateEvent.execute(oldUser, n
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
 
-  if (message.guild) {
-    await handleSaleUploadMessage(message).catch(error => console.error('Failed to process sale QR upload:', error));
-    return;
-  }
+  if (message.guild) return;
 
   const dmCommand = message.content.trim().toLowerCase();
 
