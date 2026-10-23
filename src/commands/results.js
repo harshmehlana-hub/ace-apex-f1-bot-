@@ -82,14 +82,24 @@ export default {
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scores)] });
       } catch (error) { console.error('Failed to publish race results:', error); }
 
+      let standingsSynced = true;
       try {
         await rebuildAllSeasonStandings(race.season);
-        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
       } catch (error) {
-        console.error('Race result post-processing failed:', error);
+        standingsSynced = false;
+        console.error('Race result standings reconciliation failed:', error);
       }
 
-      await p3I.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.`, components: [] });
+      try {
+        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topPredictorIds);
+      } catch (error) {
+        console.error('Predictor of the Week role reconciliation failed:', error);
+      }
+
+      const standingsMessage = standingsSynced
+        ? '📊 Season standings were updated.'
+        : '⚠️ IMPORTANT: Race scoring was saved, but the leaderboard update failed. Do not rely on the leaderboard until an administrator retries the standings update.';
+      await p3I.editReply({ content: `✅ Race scoring completed.\\n\\n🏁 ${race.name}\\n🥇 P1: ${p1}\\n🥈 P2: ${p2}\\n🥉 P3: ${p3}\\n\\n📊 ${scores.length} predictions scored.\\n\\n${standingsMessage}`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Results entry timed out.', components: [] });
