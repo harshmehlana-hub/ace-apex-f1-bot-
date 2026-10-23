@@ -306,6 +306,7 @@ async function processCancelledRacePasses(client) {
 async function processGoogleSheetSync(client) {
   const payments = await PaymentVerification.find({
     status: 'verified',
+    type: { $ne: 'sale' },
     sheetSyncStatus: { $in: ['pending', 'failed'] },
   }).sort({ updatedAt: 1 }).limit(20);
 
@@ -358,14 +359,22 @@ async function processMemberships(client) {
         let roleRemovalSucceeded = true;
 
         if (membership.roleId) {
-          try {
-            await client.rest.delete(
-              Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)
-            );
-          } catch (error) {
-            if (error?.status !== 404) {
-              roleRemovalSucceeded = false;
-              console.error('Failed to remove expired membership role:', error);
+          // A legacy Race Pass membership must not remove the shared role while a sale pass is still valid.
+          const hasSaleAccess = membership.roleId === config.roles.racePass
+            ? await (await import('../database/models/SaleEntitlement.js')).SaleEntitlement.exists({
+                userId: membership.userId, guildId: membership.guildId, status: 'active', expiresAt: { $gt: now },
+              })
+            : false;
+          if (!hasSaleAccess) {
+            try {
+              await client.rest.delete(
+                Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)
+              );
+            } catch (error) {
+              if (error?.status !== 404) {
+                roleRemovalSucceeded = false;
+                console.error('Failed to remove expired membership role:', error);
+              }
             }
           }
         }
