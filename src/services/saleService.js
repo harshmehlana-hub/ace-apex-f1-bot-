@@ -29,7 +29,7 @@ export async function startSaleSetup(interaction) {
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_name').setLabel('Sale name').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(100).setValue('End of Season Pass')),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('prices').setLabel('Prices: INR, USD (e.g. 99, 4.99)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setValue('99, 4.99')),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('paypal_url').setLabel('PayPal payment link').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(500).setPlaceholder('https://...')),
-    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_expiry').setLabel('Sale expiry (UTC ISO, e.g. 2026-11-15T18:30:00Z)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-11-15T18:30:00Z')),
+    new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('sale_expiry').setLabel('Sale closes (UTC)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-11-15T18:30:00Z')),
     new ActionRowBuilder().addComponents(new TextInputBuilder().setCustomId('role_expiry').setLabel('Race Pass role expiry (UTC ISO)').setStyle(TextInputStyle.Short).setRequired(true).setMaxLength(30).setPlaceholder('2026-12-07T00:00:00Z'))
   );
   await interaction.showModal(modal);
@@ -53,7 +53,7 @@ export async function handleSaleModal(interaction) {
     await interaction.reply({ content: '❌ Enter a sale name and valid prices as `INR, USD` (for example `99, 4.99`).', ephemeral: true });
     return true;
   }
-  const hasTimezone = value => /(Z|[+-]\\d{2}:?\\d{2})$/i.test(value);
+  const hasTimezone = value => value.endsWith('Z');
   if (Number.isNaN(saleExpiresAt.getTime()) || Number.isNaN(roleExpiresAt.getTime()) || !hasTimezone(saleExpiryInput) || !hasTimezone(roleExpiryInput)) {
     await interaction.reply({ content: '❌ Enter both dates as ISO date/time with timezone, e.g. `2026-11-15T18:30:00Z` (UTC).', ephemeral: true });
     return true;
