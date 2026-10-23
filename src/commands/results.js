@@ -99,7 +99,7 @@ export default {
       const standingsMessage = standingsSynced
         ? '📊 Season standings were updated.'
         : '⚠️ IMPORTANT: Race scoring was saved, but the leaderboard update failed. Do not rely on the leaderboard until an administrator retries the standings update.';
-      await p3I.editReply({ content: `✅ Race scoring completed.\\n\\n🏁 ${race.name}\\n🥇 P1: ${p1}\\n🥈 P2: ${p2}\\n🥉 P3: ${p3}\\n\\n📊 ${scores.length} predictions scored.\\n\\n${standingsMessage}`, components: [] });
+      await p3I.editReply({ content: `✅ Race scoring completed.\n\n🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 ${scores.length} predictions scored.\n\n${standingsMessage}`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Results entry timed out.', components: [] });
