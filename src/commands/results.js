@@ -24,7 +24,7 @@ export default {
     const response = await interaction.fetchReply();
 
     try {
-      const raceInteraction = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const raceInteraction = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const race = closedRaces.find(r => String(r._id) === raceInteraction.values[0]);
       if (!race) return raceInteraction.update({ content: '❌ Race not found.', components: [] });
       if (await Result.exists({ raceId: race._id })) return raceInteraction.update({ content: '❌ This race already has a result. Use `/recalculateresults` to correct it.', components: [] });
@@ -32,13 +32,13 @@ export default {
       const drivers = getDriverSelectOptions();
       const makeMenu = (id, placeholder, excluded = []) => new ActionRowBuilder().addComponents(new StringSelectMenuBuilder().setCustomId(id).setPlaceholder(placeholder).addOptions(drivers.filter(d => !excluded.includes(d.value))));
       await raceInteraction.update({ content: `🏁 ${race.name}\n\n🥇 Select Official P1`, components: [makeMenu('p1', 'Select Official P1')] });
-      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p1I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const p1 = p1I.values[0];
       await p1I.update({ content: `🏁 ${race.name}\n🥇 P1: ${p1}\n\n🥈 Select Official P2`, components: [makeMenu('p2', 'Select Official P2', [p1])] });
-      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p2I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const p2 = p2I.values[0];
       await p2I.update({ content: `🏁 ${race.name}\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n\n🥉 Select Official P3`, components: [makeMenu('p3', 'Select Official P3', [p1, p2])] });
-      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000 });
+      const p3I = await response.awaitMessageComponent({ componentType: ComponentType.StringSelect, time: 60000, filter: i => i.user.id === interaction.user.id });
       const p3 = p3I.values[0];
 
       // Acknowledge the component immediately because scoring, standings,
