@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const saleConfigSchema = new mongoose.Schema({
-  guildId: { type: String, required: true, unique: true },
+  guildId: { type: String, required: true, index: true },
   name: { type: String, required: true, trim: true, maxlength: 100 },
   inrAmount: { type: Number, required: true, min: 1 },
   usdAmount: { type: Number, required: true, min: 0.01 },
