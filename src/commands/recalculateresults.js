@@ -48,10 +48,24 @@ export default {
         return { scores: recalculated, topIds: recalculatedTopIds };
       });
 
-      await rebuildAllSeasonStandings(race.season);
-      await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topIds);
+      let standingsSynced = true;
+      try {
+        await rebuildAllSeasonStandings(race.season);
+      } catch (error) {
+        standingsSynced = false;
+        console.error('Corrected race standings reconciliation failed:', error);
+      }
 
-      await p3I.editReply({ content: `✅ **${race.name}** recalculated successfully.\n\n🥇 P1: ${p1}\n🥈 P2: ${p2}\n🥉 P3: ${p3}\n\n📊 All season standings and Predictor of the Week roles were reconciled.`, components: [] });
+      try {
+        await reconcilePredictorOfTheWeekRoles(interaction.guild, race.season, topIds);
+      } catch (error) {
+        console.error('Predictor of the Week role reconciliation failed:', error);
+      }
+
+      const standingsMessage = standingsSynced
+        ? '📊 Season standings were updated.'
+        : '⚠️ IMPORTANT: The corrected result and scoring were saved, but the leaderboard update failed. Do not rely on the leaderboard until an administrator retries the standings update.';
+      await p3I.editReply({ content: `✅ **${race.name}** result correction saved.\\n\\n🥇 P1: ${p1}\\n🥈 P2: ${p2}\\n🥉 P3: ${p3}\\n\\n${standingsMessage}`, components: [] });
     } catch (error) {
       console.error(error);
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⏰ Selection timed out.', components: [] });
