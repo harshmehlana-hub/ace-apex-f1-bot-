@@ -23,7 +23,7 @@ import remindCommand from './commands/remind.js';
 import grantmembershipCommand from './commands/grantmembership.js';
 import membershipinfoCommand from './commands/membershipinfo.js';
 import deletemembershipCommand from './commands/deletemembership.js';
-import privacyCommand from './commands/privacy.js'
+import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
@@ -41,39 +41,53 @@ const commands = [
   recalculateresultsCommand.data.toJSON(),
   deleteraceCommand.data.toJSON(),
   resetseasonCommand.data.toJSON(),
- adjustpointsCommand.data.toJSON(),
-setqualifyingCommand.data.toJSON(),
-extendtimeCommand.data.toJSON(),
+  adjustpointsCommand.data.toJSON(),
+  setqualifyingCommand.data.toJSON(),
+  extendtimeCommand.data.toJSON(),
   endstageCommand.data.toJSON(),
-predictqualifyingCommand.data.toJSON(),
-qualifyingresultCommand.data.toJSON(),
-deletequalifyingCommand.data.toJSON(),
-predictionstatsCommand.data.toJSON(),
-remindCommand.data.toJSON(),
-recalculatequalifyingCommand.data.toJSON(),
-grantmembershipCommand.data.toJSON(),
-membershipinfoCommand.data.toJSON(),
-deletemembershipCommand.data.toJSON(),
-privacyCommand.data.toJSON(),
-dmCommand.data.toJSON(),
+  predictqualifyingCommand.data.toJSON(),
+  qualifyingresultCommand.data.toJSON(),
+  deletequalifyingCommand.data.toJSON(),
+  predictionstatsCommand.data.toJSON(),
+  remindCommand.data.toJSON(),
+  recalculatequalifyingCommand.data.toJSON(),
+  grantmembershipCommand.data.toJSON(),
+  membershipinfoCommand.data.toJSON(),
+  deletemembershipCommand.data.toJSON(),
+  privacyCommand.data.toJSON(),
+  dmCommand.data.toJSON(),
   purchasemembershipCommand.data.toJSON(),
   announcementCommand.data.toJSON(),
   feedbackCommand.data.toJSON(),
   feedbackStatsCommand.data.toJSON(),
 ];
 
+// Publish only this command globally with DM permission. All other commands
+// remain guild-scoped as before.
+const globalCommands = [
+  {
+    ...purchasemembershipCommand.data.toJSON(),
+    dm_permission: true,
+  },
+];
+
 const rest = new REST().setToken(config.token);
 
 async function deployCommands() {
   try {
-    console.log(`Deploying ${commands.length} commands...`);
-    
-    // Deploy to specific guild (faster for development)
+    console.log(`Deploying ${commands.length} guild commands...`);
+
     await rest.put(
-  Routes.applicationGuildCommands(config.clientId, config.guildId),
-  { body: commands }
-);
-    
+      Routes.applicationGuildCommands(config.clientId, config.guildId),
+      { body: commands }
+    );
+
+    console.log('Deploying the DM-enabled global membership purchase command...');
+    await rest.put(
+      Routes.applicationCommands(config.clientId),
+      { body: globalCommands }
+    );
+
     console.log('✅ Commands deployed successfully!');
   } catch (error) {
     console.error('Failed to deploy commands:', error);
