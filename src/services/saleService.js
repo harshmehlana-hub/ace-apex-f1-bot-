@@ -57,7 +57,7 @@ export async function handleSaleModal(interaction) {
   }
   let parsedUrl;
   try { parsedUrl = new URL(paypalUrl); } catch {}
-  if (!parsedUrl || parsedUrl.protocol !== 'https:' || !/(^|\.)paypal\.com$/i.test(parsedUrl.hostname)) {
+  if (!parsedUrl || parsedUrl.protocol !== 'https:' || !/(^|\.)(paypal\.com|paypal\.me)$/i.test(parsedUrl.hostname)) {
     await interaction.reply({ content: '❌ Please enter a valid HTTPS PayPal link.', ephemeral: true });
     return true;
   }
