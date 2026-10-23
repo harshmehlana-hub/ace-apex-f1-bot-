@@ -9,7 +9,8 @@ const saleConfigSchema = new mongoose.Schema({
   qrBase64: { type: String, required: true },
   qrContentType: { type: String, default: 'image/png' },
   qrFileName: { type: String, default: 'upi-qr.png' },
-  expiresAt: { type: Date, required: true },
+  expiresAt: { type: Date, required: true }, // Last time new purchases are accepted.
+  roleExpiresAt: { type: Date, required: true }, // When purchased Race Pass access ends.
   active: { type: Boolean, default: true },
   createdBy: { type: String, required: true },
 }, { timestamps: true });
