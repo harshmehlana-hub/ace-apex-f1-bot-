@@ -1,7 +1,6 @@
 import { REST, Routes } from 'discord.js';
 import { config } from './config.js';
 
-// Import all command data
 import predictCommand from './commands/predict.js';
 import showpredictionCommand from './commands/showprediction.js';
 import leaderboardCommand from './commands/leaderboard.js';
@@ -62,32 +61,15 @@ const commands = [
   feedbackStatsCommand.data.toJSON(),
 ];
 
-// Publish only this command globally with DM permission. All other commands
-// remain guild-scoped as before.
-const globalCommands = [
-  {
-    ...purchasemembershipCommand.data.toJSON(),
-    dm_permission: true,
-  },
-];
-
 const rest = new REST().setToken(config.token);
 
 async function deployCommands() {
   try {
-    console.log(`Deploying ${commands.length} guild commands...`);
-
+    console.log(`Deploying ${commands.length} commands...`);
     await rest.put(
       Routes.applicationGuildCommands(config.clientId, config.guildId),
       { body: commands }
     );
-
-    console.log('Deploying the DM-enabled global membership purchase command...');
-    await rest.put(
-      Routes.applicationCommands(config.clientId),
-      { body: globalCommands }
-    );
-
     console.log('✅ Commands deployed successfully!');
   } catch (error) {
     console.error('Failed to deploy commands:', error);
