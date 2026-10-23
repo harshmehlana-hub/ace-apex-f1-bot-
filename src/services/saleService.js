@@ -118,7 +118,16 @@ export async function handleSaleUploadMessage(message) {
       expiresAt: pending.saleExpiresAt, roleExpiresAt: pending.roleExpiresAt, active: false, createdBy: pending.createdBy,
     });
     await SaleConfig.updateMany({ guildId: pending.guildId, active: true }, { $set: { active: false } });
-    await SaleConfig.updateOne({ _id: newSale._id }, { $set: { active: true } });
+    const activation = await SaleConfig.updateOne({ _id: newSale._id, guildId: pending.guildId }, { $set: { active: true } });
+    const savedSale = await SaleConfig.findById(newSale._id).lean();
+    console.log('[sale-debug] Sale saved and activation checked', {
+      saleId: String(newSale._id), guildId: pending.guildId, configuredGuildId: config.guildId,
+      active: savedSale?.active, matchedCount: activation.matchedCount, modifiedCount: activation.modifiedCount,
+      saleExpiresAt: savedSale?.expiresAt, roleExpiresAt: savedSale?.roleExpiresAt,
+    });
+    if (!savedSale || savedSale.active !== true || String(savedSale.guildId) !== String(pending.guildId)) {
+      throw new Error('Sale saved but failed activation verification. Check sale-debug logs.');
+    }
     pendingUploads.delete(message.author.id);
     await message.reply('✅ **' + pending.name + '** is now active. Users can DM SALE to purchase it. The UPI QR image is saved with the sale.');
     await message.delete().catch(() => {});
@@ -136,8 +145,14 @@ export async function startSalePurchase(user) {
     await user.send('⚠️ You already have a payment verification request pending. Please wait for an admin to verify it.');
     return;
   }
-  const sale = await SaleConfig.findOne({ guildId: config.guildId, active: true, expiresAt: { $gt: new Date() } }).lean();
+  const now = new Date();
+  const sale = await SaleConfig.findOne({ guildId: config.guildId, active: true, expiresAt: { $gt: now } }).lean();
   if (!sale) {
+    const diagnostics = await SaleConfig.find({ guildId: config.guildId }).sort({ createdAt: -1 }).limit(5).select('name active expiresAt createdAt guildId').lean();
+    console.warn('[sale-debug] No active sale matched buyer lookup', {
+      configuredGuildId: config.guildId, now: now.toISOString(),
+      recentSales: diagnostics.map(item => ({ id: String(item._id), guildId: item.guildId, active: item.active, expiresAt: item.expiresAt, createdAt: item.createdAt, name: item.name })),
+    });
     await user.send('🏁 There is no active sale right now. Please check again later.');
     return;
   }
