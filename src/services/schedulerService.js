@@ -357,14 +357,14 @@ async function processMemberships(client) {
 
         if (membership.roleId) {
           try {
-              await client.rest.delete(
-                Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)
-              );
-            } catch (error) {
-              if (error?.status !== 404) {
-                roleRemovalSucceeded = false;
-                console.error('Failed to remove expired membership role:', error);
-              }
+            await client.rest.delete(
+              Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)
+            );
+          } catch (error) {
+            if (error?.status !== 404) {
+              roleRemovalSucceeded = false;
+              console.error('Failed to remove expired membership role:', error);
+            }
           }
         }
 
