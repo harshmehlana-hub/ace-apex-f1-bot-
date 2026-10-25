@@ -1,7 +1,6 @@
 import { Routes } from 'discord.js';
 import { RacePass } from '../database/models/RacePass.js';
 import { Membership } from '../database/models/Membership.js';
-import { SaleEntitlement } from '../database/models/SaleEntitlement.js';
 import { config } from '../config.js';
 import { getRacePass } from '../config/racePasses2026.js';
 
@@ -15,12 +14,11 @@ async function removeRacePassRoleIfUnused(client, racePass) {
   const roleId = config.roles.racePass;
   if (!roleId) return;
   const now = new Date();
-  const [anotherActive, legacyMembership, saleAccess] = await Promise.all([
+  const [anotherActive, legacyMembership] = await Promise.all([
     RacePass.exists({ userId: racePass.userId, guildId: racePass.guildId, status: 'active', expiresAt: { $gt: now }, _id: { $ne: racePass._id } }),
     Membership.exists({ userId: racePass.userId, guildId: racePass.guildId, type: 'race', expiresAt: { $gt: now } }),
-    SaleEntitlement.exists({ userId: racePass.userId, guildId: racePass.guildId, status: 'active', expiresAt: { $gt: now } }),
   ]);
-  if (!anotherActive && !legacyMembership && !saleAccess) {
+  if (!anotherActive && !legacyMembership) {
     await client.rest.delete(Routes.guildMemberRole(racePass.guildId, racePass.userId, roleId)).catch((error) => {
       if (error?.status !== 404) console.error('Failed to remove expired Race Pass role:', error);
     });
