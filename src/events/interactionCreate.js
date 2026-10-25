@@ -3,22 +3,11 @@ import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from '../services/purchaseMembershipService.js';
 import { handleFeedbackInteraction, handleFeedbackModal, handleFeedbackStatsInteraction, handleFeedbackAdminInteraction } from '../services/feedbackService.js';
-import { handleSaleInteraction, handleSaleModal, handleSalePaymentModal } from '../services/saleService.js';
 
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
-      if (interaction.customId?.startsWith('sale:')) {
-        try {
-          const handled = await handleSaleInteraction(interaction);
-          if (handled) return;
-        } catch (error) {
-          console.error('Error handling sale interaction:', error);
-          if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Something went wrong with this sale. Please try again.', ephemeral: true }).catch(() => {});
-          return;
-        }
-      }
       if (interaction.customId?.startsWith('feedback:')) {
         try {
           const handled = await handleFeedbackInteraction(interaction);
@@ -58,16 +47,6 @@ export default {
     }
 
     if (interaction.isModalSubmit()) {
-      if (interaction.customId?.startsWith('sale:')) {
-        try {
-          if (await handleSaleModal(interaction)) return;
-          if (await handleSalePaymentModal(interaction, client)) return;
-        } catch (error) {
-          console.error('Error handling sale modal:', error);
-          if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Something went wrong while submitting the sale form.', ephemeral: true }).catch(() => {});
-        }
-        return;
-      }
       if (interaction.customId?.startsWith('feedback:modal:')) {
         try {
           await handleFeedbackModal(interaction);
