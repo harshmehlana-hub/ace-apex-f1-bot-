@@ -34,13 +34,11 @@ import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
-import saleCommand from './commands/sale.js';
 import announcementCommand from './commands/announcement.js';
 import feedbackCommand from './commands/feedback.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
 import { startPurchase } from './services/purchaseMembershipService.js';
-import { startSalePurchase } from './services/saleService.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -86,7 +84,6 @@ const commands = [
   privacyCommand,
   dmCommand,
   purchasemembershipCommand,
-  saleCommand,
   announcementCommand,
   feedbackCommand,
   feedbackStatsCommand,
@@ -109,11 +106,6 @@ client.on('messageCreate', async (message) => {
 
   if (dmCommand === '/predict' || dmCommand === '/predictqualifying') {
     await message.reply('Use the bot commands in server please, Thanks :)').catch(() => {});
-  } else if (dmCommand === 'sale') {
-    await startSalePurchase(message.author).catch((error) => {
-      console.error('Failed to handle SALE DM command:', error);
-      message.reply('❌ Something went wrong starting the sale purchase. Please try again.').catch(() => {});
-    });
   } else if (dmCommand === '/purchasemembership') {
     // Reuse the same purchase flow as the slash command, adapted for a text DM.
     await startPurchase({
