@@ -21,7 +21,7 @@ const paymentVerificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['race', 'monthly', 'yearly', 'sale'],
+    enum: ['race', 'monthly', 'yearly'],
     required: true,
   },
   raceKey: {
@@ -32,10 +32,6 @@ const paymentVerificationSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
-  saleName: { type: String, default: null },
-  saleExpiresAt: { type: Date, default: null },
-  saleRoleExpiresAt: { type: Date, default: null },
-  saleConfigId: { type: String, default: null },
   amount: {
     type: Number,
     required: true,
