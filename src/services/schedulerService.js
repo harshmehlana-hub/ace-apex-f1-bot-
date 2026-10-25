@@ -5,13 +5,11 @@ import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { Membership } from '../database/models/Membership.js';
-import { SaleEntitlement } from '../database/models/SaleEntitlement.js';
 import { config } from '../config.js';
 import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createPredictionStatisticsEmbed } from '../utils/embeds.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { getCurrentSeason } from './seasonService.js';
 import { processRacePasses, cancelRacePassesForRace } from './racePassService.js';
-import { processSaleEntitlements } from './saleService.js';
 import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 import { SchedulerLock } from '../database/models/SchedulerLock.js';
@@ -45,7 +43,6 @@ export function setupScheduler(client) {
         ['reminders', () => processReminders(client)],
         ['memberships', () => processMemberships(client)],
         ['Race Passes', () => processRacePasses(client)],
-        ['sale entitlements', () => processSaleEntitlements(client)],
         ['cancelled Race Passes', () => processCancelledRacePasses(client)],
         ['Google Sheets sync', () => processGoogleSheetSync(client)],
         ['stale payment verifications', () => processStalePaymentVerifications()],
@@ -307,7 +304,6 @@ async function processCancelledRacePasses(client) {
 async function processGoogleSheetSync(client) {
   const payments = await PaymentVerification.find({
     status: 'verified',
-    type: { $ne: 'sale' },
     sheetSyncStatus: { $in: ['pending', 'failed'] },
   }).sort({ updatedAt: 1 }).limit(20);
 
@@ -360,14 +356,7 @@ async function processMemberships(client) {
         let roleRemovalSucceeded = true;
 
         if (membership.roleId) {
-          // A legacy Race Pass membership must not remove the shared role while a sale pass is still valid.
-          const hasSaleAccess = membership.roleId === config.roles.racePass
-            ? await SaleEntitlement.exists({
-                userId: membership.userId, guildId: membership.guildId, status: 'active', expiresAt: { $gt: now },
-              })
-            : false;
-          if (!hasSaleAccess) {
-            try {
+          try {
               await client.rest.delete(
                 Routes.guildMemberRole(membership.guildId, membership.userId, membership.roleId)
               );
@@ -376,7 +365,6 @@ async function processMemberships(client) {
                 roleRemovalSucceeded = false;
                 console.error('Failed to remove expired membership role:', error);
               }
-            }
           }
         }
 
