@@ -6,6 +6,7 @@ import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
 import { Membership } from '../database/models/Membership.js';
 import { config } from '../config.js';
+import { logDM } from '../utils/dmLogger.js';
 import { createRaceAnnouncementEmbed, createQualifyingAnnouncementEmbed, createPredictionStatisticsEmbed } from '../utils/embeds.js';
 import { Prediction } from '../database/models/Prediction.js';
 import { getCurrentSeason } from './seasonService.js';
@@ -437,6 +438,14 @@ async function sendMembershipDM(client, membership, title, message) {
   try {
     const user = await client.users.fetch(membership.userId);
     await user.send(`**${title}**\n\n${message}`);
+
+    const logType = title === '5 days remaining'
+      ? '5-Day Reminder'
+      : title === '1 day remaining'
+        ? '1-Day Reminder'
+        : 'Membership Expired';
+    await logDM(client, logType, null, user, message);
+
     return true;
   } catch (error) {
     console.error(`Failed to DM membership user ${membership.userId}:`, error);
