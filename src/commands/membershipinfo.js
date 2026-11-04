@@ -1,94 +1,111 @@
 import {
   SlashCommandBuilder,
   PermissionFlagsBits,
+  EmbedBuilder,
 } from 'discord.js';
 
 import { Membership } from '../database/models/Membership.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 
+const MEMBERSHIPS_PER_PAGE = 18;
+const MAX_PAGES = 10;
+
+function membershipType(type) {
+  return type === 'race'
+    ? 'Race Pass'
+    : type === 'monthly'
+      ? 'Monthly'
+      : 'Yearly';
+}
+
+function makePages(memberships, usernames, guildName) {
+  const rows = memberships.map((membership, index) => {
+    const expiryTimestamp = Math.floor(membership.expiresAt.getTime() / 1000);
+    const username = usernames.get(membership.userId) || `<@${membership.userId}>`;
+    return [
+      `**${index + 1}. ${username}**`,
+      `🎟️ ${membershipType(membership.type)}`,
+      `⏰ <t:${expiryTimestamp}:F> · <t:${expiryTimestamp}:R>`,
+    ].join('  |  ');
+  });
+
+  const pageCount = Math.min(
+    MAX_PAGES,
+    Math.ceil(rows.length / MEMBERSHIPS_PER_PAGE)
+  );
+
+  return Array.from({ length: pageCount }, (_, pageIndex) => {
+    const pageRows = rows.slice(
+      pageIndex * MEMBERSHIPS_PER_PAGE,
+      (pageIndex + 1) * MEMBERSHIPS_PER_PAGE
+    );
+
+    return new EmbedBuilder()
+      .setColor(0x3498db)
+      .setTitle('🎟️ Active Verified Memberships')
+      .setDescription(pageRows.join('\n\n'))
+      .setFooter({
+        text: `${guildName} • ${memberships.length} active memberships • Page ${pageIndex + 1}/${pageCount}`,
+      })
+      .setTimestamp();
+  });
+}
+
 export default {
   data: new SlashCommandBuilder()
     .setName('membershipinfo')
-    .setDescription("View a member's membership information")
-
-    .addUserOption(option =>
-      option
-        .setName('user')
-        .setDescription('Member')
-        .setRequired(true)
-    )
-
-    .setDefaultMemberPermissions(
-      PermissionFlagsBits.Administrator
-    ),
+    .setDescription('View all active verified memberships, sorted by expiry')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
-    // ----------------------------------------
-    // ADMIN CHECK
-    // ----------------------------------------
     if (!isAdmin(interaction.member, config.roles.admin)) {
       return interaction.reply({
-        content:
-          '❌ You do not have permission to use this command.',
+        content: '❌ You do not have permission to use this command.',
         ephemeral: true,
       });
     }
 
-    // ----------------------------------------
-    // GET USER
-    // ----------------------------------------
-    const user = interaction.options.getUser('user');
+    await interaction.deferReply({ ephemeral: true });
 
-    if (!user) {
-      return interaction.reply({
-        content: '❌ User not found.',
-        ephemeral: true,
-      });
-    }
-
-    // ----------------------------------------
-    // FIND MEMBERSHIP
-    // ----------------------------------------
-    const membership = await Membership.findOne({
-      userId: user.id,
+    const memberships = await Membership.find({
       guildId: interaction.guild.id,
-    });
+      expiresAt: { $gt: new Date() },
+    })
+      .sort({ expiresAt: 1 })
+      .limit(MEMBERSHIPS_PER_PAGE * MAX_PAGES)
+      .lean();
 
-    if (!membership) {
-      return interaction.reply({
-        content:
-          `${user} does not have an active membership.`,
-        ephemeral: true,
+    if (!memberships.length) {
+      return interaction.editReply({
+        content: 'There are currently no active verified memberships.',
       });
     }
 
-    // ----------------------------------------
-    // MEMBERSHIP TYPE
-    // ----------------------------------------
-    const type =
-      membership.type === 'race'
-        ? 'Race Pass'
-        : membership.type === 'monthly'
-          ? 'Monthly'
-          : 'Yearly';
+    const userIds = [...new Set(memberships.map((membership) => membership.userId))];
+    const usernames = new Map();
 
-    // ----------------------------------------
-    // RESPONSE
-    // ----------------------------------------
-    await interaction.reply({
-      content:
-        `👤 **Member:** ${user}\n\n` +
-        `🎟️ **Membership:** ${type}\n` +
-        `🎭 **Role:** <@&${membership.roleId}>\n\n` +
-        `⏰ **Expires:**\n` +
-        `<t:${Math.floor(
-          membership.expiresAt.getTime() / 1000
-        )}:F>\n` +
-        `<t:${Math.floor(
-          membership.expiresAt.getTime() / 1000
-        )}:R>`,
-      ephemeral: true,
-    });
+    await Promise.all(userIds.map(async (userId) => {
+      try {
+        const member = await interaction.guild.members.fetch(userId);
+        usernames.set(userId, member.displayName);
+      } catch {
+        usernames.set(userId, `<@${userId}>`);
+      }
+    }));
+
+    const embeds = makePages(memberships, usernames, interaction.guild.name);
+    const omitted = await Membership.countDocuments({
+      guildId: interaction.guild.id,
+      expiresAt: { $gt: new Date() },
+    }) - memberships.length;
+
+    if (omitted > 0) {
+      embeds[embeds.length - 1].setFooter({
+        text: `${interaction.guild.name} • Showing first ${memberships.length} active memberships • ${omitted} more not shown`,
+      });
+    }
+
+    return interaction.editReply({ embeds });
   },
 };
