@@ -22,7 +22,7 @@ export async function processStickMessages(client) {
         await StickMessage.updateOne({ _id: claimed._id }, { $set: { active: false } });
         continue;
       }
-      await channel.send({ content: claimed.message, allowedMentions: { parse: [] } });
+      await channel.send({ content: claimed.message, allowedMentions: { parse: ['users', 'roles', 'everyone'] } });
     } catch (error) {
       console.error('[Stick Messages] Failed to send repeating message:', error);
       // Retry a failed send after one minute without changing its chosen repeat interval.
