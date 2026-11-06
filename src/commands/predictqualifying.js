@@ -17,17 +17,17 @@ export default {
     .setName('predictqualifying')
     .setDescription('Predict the Pole Position winner'),
 
-  async execute(interaction, client) {
+  async execute(interaction, client, fixedQualifyingId = null) {
     const activeSeason = await getCurrentSeason();
-    const openSessions = await Qualifying.find({
-      season: activeSeason,
-      status: 'open',
-    }).sort({ sessionStartTime: 1 }).limit(25);
+    const sessionFilter = { season: activeSeason, status: 'open' };
+    if (fixedQualifyingId) sessionFilter._id = fixedQualifyingId;
+    const openSessions = await Qualifying.find(sessionFilter).sort({ sessionStartTime: 1 }).limit(25);
 
     if (openSessions.length === 0) {
       return interaction.reply({
-        content:
-          '❌ There are currently no qualifying sessions open for predictions.',
+        content: fixedQualifyingId
+          ? '❌ Predictions for the qualifying session linked to this announcement are no longer open.'
+          : '❌ There are currently no qualifying sessions open for predictions.',
         ephemeral: true,
       });
     }
