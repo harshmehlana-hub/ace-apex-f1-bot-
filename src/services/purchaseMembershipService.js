@@ -227,7 +227,28 @@ export async function handlePurchaseModal(interaction, client) {
       new ButtonBuilder().setCustomId(VERIFY_PREFIX + ':' + request.requestId).setLabel('Verify & Grant').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId(REJECT_PREFIX + ':' + request.requestId).setLabel('Reject').setStyle(ButtonStyle.Danger),
     );
-    await channel.send({ embeds: [embed], components: [buttons] });
+    const guild = await client.guilds.fetch(config.guildId);
+    await guild.roles.fetch();
+    const communityManagerRole = guild.roles.cache.find(
+      (role) => role.name.toLowerCase() === 'community manager'
+    );
+    const notifyMentions = [
+      communityManagerRole ? '<@&' + communityManagerRole.id + '>' : null,
+      '<@1476246684752150528>',
+    ].filter(Boolean).join(' ');
+
+    await channel.send({
+      content: notifyMentions || undefined,
+      embeds: [embed],
+      components: [buttons],
+      allowedMentions: {
+        users: ['1476246684752150528'],
+        roles: communityManagerRole ? [communityManagerRole.id] : [],
+      },
+    });
+    if (!communityManagerRole) {
+      console.warn('Community Manager role was not found; notified the configured membership contact only.');
+    }
   } catch (error) {
     await PaymentVerification.deleteOne({ _id: request._id });
     console.error('Failed to send payment verification log:', error);
