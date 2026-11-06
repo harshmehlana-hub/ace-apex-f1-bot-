@@ -1,4 +1,4 @@
-import { auditAdminCommand } from '../services/auditService.js';
+import { auditAdminCommand, logPurchaseButtonClick } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes, startPurchase } from '../services/purchaseMembershipService.js';
@@ -9,6 +9,7 @@ export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
     if (interaction.isButton() && interaction.customId === 'purchase_start') {
+      await logPurchaseButtonClick(interaction);
       try {
         await startPurchase(interaction, client);
       } catch (error) {
