@@ -35,6 +35,8 @@ import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
 import purchasemembershipCommand from './commands/purchasemembership.js';
 import announcementCommand from './commands/announcement.js';
+import stickstartCommand from './commands/stickstart.js';
+import stickstopCommand from './commands/stickstop.js';
 import feedbackCommand from './commands/feedback.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
@@ -85,6 +87,8 @@ const commands = [
   dmCommand,
   purchasemembershipCommand,
   announcementCommand,
+  stickstartCommand,
+  stickstopCommand,
   feedbackCommand,
   feedbackStatsCommand,
 ];
