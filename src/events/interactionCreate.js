@@ -2,12 +2,22 @@ import { auditAdminCommand } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from '../services/purchaseMembershipService.js';
+import { handleStickStopInteraction } from '../commands/stickstop.js';
 import { handleFeedbackInteraction, handleFeedbackModal, handleFeedbackStatsInteraction, handleFeedbackAdminInteraction } from '../services/feedbackService.js';
 
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
+      if (interaction.customId?.startsWith('stickstop:')) {
+        try {
+          const handled = await handleStickStopInteraction(interaction);
+          if (handled) return;
+        } catch (error) {
+          console.error('Error handling stickstop selection:', error);
+          if (!interaction.replied && !interaction.deferred) await interaction.reply({ content: '❌ Could not stop that repeating message.', ephemeral: true }).catch(() => {});
+        }
+      }
       if (interaction.customId?.startsWith('feedback:')) {
         try {
           const handled = await handleFeedbackInteraction(interaction);
