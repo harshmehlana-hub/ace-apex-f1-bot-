@@ -39,7 +39,7 @@ export default {
 
     if (frequency === null) {
       try {
-        await channel.send({ content: message, allowedMentions: { parse: [] } });
+        await channel.send({ content: message, allowedMentions: { parse: ['users', 'roles', 'everyone'] } });
         return interaction.reply({
           content: `✅ Your one-time message has been sent in <#${channel.id}>. It will not appear in /stickhold.`,
           ephemeral: true,
