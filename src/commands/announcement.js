@@ -1,4 +1,4 @@
-import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType, PermissionFlagsBits, SlashCommandBuilder } from 'discord.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 
@@ -50,7 +50,7 @@ export default {
     }
 
     try {
-      await channel.send({ content: buildRaceWeekendAnnouncement(raceName) });
+      await channel.send({\n        content: buildRaceWeekendAnnouncement(raceName),\n        components: [new ActionRowBuilder().addComponents(\n          new ButtonBuilder()\n            .setCustomId('purchase_start')\n            .setLabel('Get Race Pass / Membership')\n            .setEmoji('🎟️')\n            .setStyle(ButtonStyle.Primary)\n        )],\n      });
       return interaction.reply({
         content: `✅ Race-weekend announcement for **${raceName}** sent to <#${channel.id}>.`,
         ephemeral: true,
