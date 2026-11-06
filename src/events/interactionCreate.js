@@ -1,13 +1,25 @@
 import { auditAdminCommand } from '../services/auditService.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
-import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes } from '../services/purchaseMembershipService.js';
+import { handlePurchaseInteraction, handlePurchaseModal, purchasePrefixes, startPurchase } from '../services/purchaseMembershipService.js';
 import { handleStickHoldInteraction } from '../commands/stickhold.js';
 import { handleFeedbackInteraction, handleFeedbackModal, handleFeedbackStatsInteraction, handleFeedbackAdminInteraction } from '../services/feedbackService.js';
 
 export default {
   name: 'interactionCreate',
   async execute(interaction, client) {
+    if (interaction.isButton() && interaction.customId === 'purchase_start') {
+      try {
+        await startPurchase(interaction, client);
+      } catch (error) {
+        console.error('Error starting membership purchase from announcement button:', error);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '❌ Something went wrong starting your purchase. Please try again.', ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
+
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
       if (interaction.customId?.startsWith('stickhold:')) {
         try {
