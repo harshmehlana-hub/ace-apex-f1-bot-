@@ -21,6 +21,23 @@ export default {
       return;
     }
 
+    if (interaction.isButton() && (interaction.customId.startsWith('predict_race:') || interaction.customId.startsWith('predict_qualifying:'))) {
+      const [kind, sessionId] = interaction.customId.split(':');
+      try {
+        if (kind === 'predict_race') {
+          await client.commands.get('predict').execute(interaction, client, sessionId);
+        } else {
+          await client.commands.get('predictqualifying').execute(interaction, client, sessionId);
+        }
+      } catch (error) {
+        console.error('Error starting prediction from announcement button:', error);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '❌ Could not start this prediction. Please try the slash command instead.', ephemeral: true }).catch(() => {});
+        }
+      }
+      return;
+    }
+
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
       if (interaction.customId?.startsWith('stickhold:')) {
         try {
