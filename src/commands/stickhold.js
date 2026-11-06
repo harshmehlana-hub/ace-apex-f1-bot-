@@ -88,11 +88,24 @@ export async function handleStickHoldInteraction(interaction) {
         { new: true }
       );
     } else {
-      item = await StickMessage.findOneAndUpdate(
-        { _id: id, guildId: interaction.guildId, paused: true },
-        { $set: { active: true, paused: false, nextSendAt: new Date(Date.now() + (15) * 60 * 1000) } },
-        { new: true }
-      );
+      const pausedItem = await StickMessage.findOne({
+        _id: id,
+        guildId: interaction.guildId,
+        paused: true,
+      });
+      if (pausedItem) {
+        item = await StickMessage.findOneAndUpdate(
+          { _id: id, guildId: interaction.guildId, paused: true },
+          {
+            $set: {
+              active: true,
+              paused: false,
+              nextSendAt: new Date(Date.now() + (pausedItem.intervalMinutes || 15) * 60 * 1000),
+            },
+          },
+          { new: true }
+        );
+      }
     }
 
     if (!item) {
