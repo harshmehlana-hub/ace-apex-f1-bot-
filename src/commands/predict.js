@@ -19,13 +19,17 @@ export default {
     .setName('predict')
     .setDescription('Submit your podium prediction'),
 
-  async execute(interaction, client) {
+  async execute(interaction, client, fixedRaceId = null) {
     const activeSeason = await getCurrentSeason();
-    const openRaces = await Race.find({ season: activeSeason, status: 'open' }).sort({ raceStartTime: 1 }).limit(25);
+    const raceFilter = { season: activeSeason, status: 'open' };
+    if (fixedRaceId) raceFilter._id = fixedRaceId;
+    const openRaces = await Race.find(raceFilter).sort({ raceStartTime: 1 }).limit(25);
 
     if (openRaces.length === 0) {
       return interaction.reply({
-        content: '❌ There are no races currently open for predictions.',
+        content: fixedRaceId
+          ? '❌ Predictions for the race linked to this announcement are no longer open.'
+          : '❌ There are no races currently open for predictions.',
         ephemeral: true,
       });
     }
