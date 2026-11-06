@@ -15,6 +15,7 @@ import { PaymentVerification } from '../database/models/PaymentVerification.js';
 import { syncVerifiedPaymentToSheet } from './paymentSheetSyncService.js';
 import { SchedulerLock } from '../database/models/SchedulerLock.js';
 import { StageEndSchedule } from '../database/models/StageEndSchedule.js';
+import { processStickMessages } from './stickMessageService.js';
 
 export function setupScheduler(client) {
   const run = async () => {
@@ -48,6 +49,7 @@ export function setupScheduler(client) {
         ['Google Sheets sync', () => processGoogleSheetSync(client)],
         ['stale payment verifications', () => processStalePaymentVerifications()],
         ['scheduled stage ends', () => processScheduledStageEnds(client)],
+        ['repeating messages', () => processStickMessages(client)],
       ];
       const outcomes = await Promise.allSettled(tasks.map(([, task]) => task()));
       outcomes.forEach((outcome, index) => {
