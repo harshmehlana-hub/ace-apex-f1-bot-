@@ -33,14 +33,12 @@ import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
-import purchasemembershipCommand from './commands/purchasemembership.js';
 import announcementCommand from './commands/announcement.js';
 import stickstartCommand from './commands/stickstart.js';
 import stickholdCommand from './commands/stickhold.js';
 import feedbackCommand from './commands/feedback.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
-import { startPurchase } from './services/purchaseMembershipService.js';
 
 // Import events
 import readyEvent from './events/ready.js';
@@ -85,7 +83,6 @@ const commands = [
   deletemembershipCommand,
   privacyCommand,
   dmCommand,
-  purchasemembershipCommand,
   announcementCommand,
   stickstartCommand,
   stickholdCommand,
@@ -110,18 +107,6 @@ client.on('messageCreate', async (message) => {
 
   if (dmCommand === '/predict' || dmCommand === '/predictqualifying') {
     await message.reply('Use the bot commands in server please, Thanks :)').catch(() => {});
-  } else if (dmCommand === '/purchasemembership') {
-    // Reuse the same purchase flow as the slash command, adapted for a text DM.
-    await startPurchase({
-      user: message.author,
-      reply: async (options) => {
-        const { ephemeral, ...messageOptions } = options || {};
-        return message.reply(messageOptions);
-      },
-    }, client).catch((error) => {
-      console.error('Failed to handle /purchasemembership DM text command:', error);
-      message.reply('❌ Something went wrong starting the membership purchase. Please try again.').catch(() => {});
-    });
   }
 
   let content = message.content;
