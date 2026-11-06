@@ -25,7 +25,6 @@ import deletemembershipCommand from './commands/deletemembership.js';
 import privacyCommand from './commands/privacy.js';
 import dmCommand from './commands/dm.js';
 import recalculatequalifyingCommand from './commands/recalculatequalifying.js';
-import purchasemembershipCommand from './commands/purchasemembership.js';
 import announcementCommand from './commands/announcement.js';
 import stickstartCommand from './commands/stickstart.js';
 import stickholdCommand from './commands/stickhold.js';
@@ -57,7 +56,6 @@ const commands = [
   deletemembershipCommand.data.toJSON(),
   privacyCommand.data.toJSON(),
   dmCommand.data.toJSON(),
-  purchasemembershipCommand.data.toJSON(),
   announcementCommand.data.toJSON(),
   stickstartCommand.data.toJSON(),
   stickholdCommand.data.toJSON(),
