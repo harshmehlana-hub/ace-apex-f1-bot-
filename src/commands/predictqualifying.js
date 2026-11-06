@@ -45,11 +45,12 @@ export default {
         .addOptions(sessionOptions)
     );
 
-    const response = await interaction.reply({
+    await interaction.reply({
       content: '🏁 **Select a qualifying session:**',
       components: [sessionSelect],
       ephemeral: true,
     });
+    const response = await interaction.fetchReply();
 
     try {
       const sessionInteraction =
