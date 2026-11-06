@@ -33,3 +33,19 @@ export async function auditAdminCommand(interaction, status = 'started', error =
     console.error('Failed to write admin audit log:', auditError);
   }
 }
+
+export async function logPurchaseButtonClick(interaction) {
+  try {
+    const channel = await interaction.client.channels.fetch(USAGE_LOG_CHANNEL_ID);
+    if (!channel?.isTextBased() || !channel.send) {
+      throw new Error('Usage logs channel is not a text channel or is unavailable.');
+    }
+
+    await channel.send({
+      content: `🎟️ <@${interaction.user.id}> clicked **Get Race Pass / Membership** in <#${interaction.channelId}>.`,
+      allowedMentions: { parse: [] },
+    });
+  } catch (error) {
+    console.error('Failed to log membership purchase button click:', error);
+  }
+}
