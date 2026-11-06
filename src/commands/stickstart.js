@@ -41,7 +41,7 @@ export default {
       try {
         await channel.send({ content: message, allowedMentions: { parse: [] } });
         return interaction.reply({
-          content: `✅ Your one-time message has been sent in <#${channel.id}>. It will not appear in /stickstop.`,
+          content: `✅ Your one-time message has been sent in <#${channel.id}>. It will not appear in /stickhold.`,
           ephemeral: true,
         });
       } catch (error) {
@@ -60,7 +60,7 @@ export default {
     });
 
     return interaction.reply({
-      content: `✅ Repeating message started in <#${channel.id}>. It will first send in ${frequency} minute(s), then repeat every ${frequency} minute(s). Use /stickstop to stop it.`,
+      content: `✅ Repeating message started in <#${channel.id}>. It will first send in ${frequency} minute(s), then repeat every ${frequency} minute(s). Use /stickhold to pause, resume, or stop it.`,
       ephemeral: true,
     });
   },
