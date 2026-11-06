@@ -4,14 +4,16 @@ import { isAdmin } from '../utils/validators.js';
 
 function buildRaceWeekendAnnouncement(raceName) {
   return `@everyone
-Its race weekend again, ways to watch F1 in our server:\n
+Its race weekend again, ways to watch F1 in our server:
+
 Free to everyone (may lag/get full)
 Race Pass for ${raceName} (30 INR / 1.5 USD)
 Monthly Supporters membership (50 INR / 3 USD)
-Yearly Supporters membership (450 INR / 28 USD)\n
-Use \`/purchasemembership\` to get access to Race Pass or Membership.
+Yearly Supporters membership (450 INR / 28 USD)
 
-*NOTE : Race Pass and Membership are for those who want to support the server and watch the race sessions peacefully out of the chaos without lags, else free streams for race and quali will be held no need to worry.*`;
+Click the **🎟️ Get Race Pass / Membership** button below to view payment options. The bot will send the purchase steps to your DMs.
+
+*NOTE: Race Pass and Membership are for those who want to support the server and watch the race sessions peacefully out of the chaos without lags. Free streams for race and qualifying will still be available.*`;
 }
 
 export default {
@@ -50,7 +52,16 @@ export default {
     }
 
     try {
-      await channel.send({\n        content: buildRaceWeekendAnnouncement(raceName),\n        components: [new ActionRowBuilder().addComponents(\n          new ButtonBuilder()\n            .setCustomId('purchase_start')\n            .setLabel('Get Race Pass / Membership')\n            .setEmoji('🎟️')\n            .setStyle(ButtonStyle.Primary)\n        )],\n      });
+      await channel.send({
+        content: buildRaceWeekendAnnouncement(raceName),
+        components: [new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId('purchase_start')
+            .setLabel('Get Race Pass / Membership')
+            .setEmoji('🎟️')
+            .setStyle(ButtonStyle.Primary)
+        )],
+      });
       return interaction.reply({
         content: `✅ Race-weekend announcement for **${raceName}** sent to <#${channel.id}>.`,
         ephemeral: true,
