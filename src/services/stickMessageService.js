@@ -7,9 +7,10 @@ export async function processStickMessages(client) {
 
   for (const item of due) {
     // Claim each scheduled send before posting so scheduler retries cannot duplicate it.
-    const nextSendAt = new Date(Date.now() + 15 * 60 * 1000);
+    const claimedAt = new Date();
+    const nextSendAt = new Date(claimedAt.getTime() + item.intervalMinutes * 60 * 1000);
     const claimed = await StickMessage.findOneAndUpdate(
-      { _id: item._id, active: true, nextSendAt: { $lte: new Date() } },
+      { _id: item._id, active: true, nextSendAt: { $lte: claimedAt } },
       { $set: { nextSendAt } },
       { new: true }
     );
@@ -24,7 +25,7 @@ export async function processStickMessages(client) {
       await channel.send({ content: claimed.message, allowedMentions: { parse: [] } });
     } catch (error) {
       console.error('[Stick Messages] Failed to send repeating message:', error);
-      // Keep it active and retry on the next scheduler cycle if sending failed.
+      // Retry a failed send after one minute without changing its chosen repeat interval.
       await StickMessage.updateOne(
         { _id: claimed._id, active: true, nextSendAt },
         { $set: { nextSendAt: new Date(Date.now() + 60 * 1000) } }
