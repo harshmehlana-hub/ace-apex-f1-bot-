@@ -8,7 +8,7 @@ export async function processStickMessages(client) {
   for (const item of due) {
     // Claim each scheduled send before posting so scheduler retries cannot duplicate it.
     const claimedAt = new Date();
-    const nextSendAt = new Date(claimedAt.getTime() + item.intervalMinutes * 60 * 1000);
+    const nextSendAt = new Date(claimedAt.getTime() + (item.intervalMinutes || 15) * 60 * 1000);
     const claimed = await StickMessage.findOneAndUpdate(
       { _id: item._id, active: true, nextSendAt: { $lte: claimedAt } },
       { $set: { nextSendAt } },
