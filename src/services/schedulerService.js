@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { randomUUID } from 'crypto';
-import { Routes } from 'discord.js';
+import { Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import { Race } from '../database/models/Race.js';
 import { Reminder } from '../database/models/Reminder.js';
 import { Qualifying } from '../database/models/Qualifying.js';
@@ -203,10 +203,17 @@ async function processPredictionReminders(client, session, isQualifying) {
       const channel = await client.channels.fetch(config.channels.announcements);
       if (!channel) throw new Error('Announcement channel not found');
 
-      const command = isQualifying ? '/predictqualifying' : '/predict';
       const type = isQualifying ? 'Qualifying predictions' : 'Race predictions';
+      const button = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`${isQualifying ? 'predict_qualifying' : 'predict_race'}:${session._id}`)
+          .setLabel(isQualifying ? 'Predict Qualifying' : 'Predict Now')
+          .setStyle(ButtonStyle.Primary)
+          .setEmoji('🏁')
+      );
       await channel.send({
-        content: `@everyone ⏰ **${reminder.label} remaining** to submit your ${type.toLowerCase()} for **${session.name}**. Use ${command} and submit now!`,
+        content: `@everyone ⏰ **${reminder.label} remaining** to submit your ${type.toLowerCase()} for **${session.name}**. Make your prediction now!`,
+        components: [button],
       });
     } catch (error) {
       await Model.updateOne({ _id: session._id }, { $set: { [reminder.key]: false } });
@@ -226,7 +233,10 @@ async function claimAndSendRaceAnnouncement(client, race) {
   try {
     const channel = await client.channels.fetch(config.channels.announcements);
     if (!channel) throw new Error('Announcement channel not found');
-    await channel.send({ content: '@everyone 🏁 Race Predictions are now LIVE!', embeds: [createRaceAnnouncementEmbed(race)] });
+    const button = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`predict_race:${race._id}`).setLabel('Predict Now').setStyle(ButtonStyle.Primary).setEmoji('🏁')
+    );
+    await channel.send({ content: '@everyone 🏁 Race Predictions are now LIVE!', embeds: [createRaceAnnouncementEmbed(race)], components: [button] });
   } catch (error) {
     await Race.updateOne({ _id: race._id }, { $set: { announcementSent: false } });
     console.error('Failed to send prediction announcement:', error);
@@ -244,7 +254,10 @@ async function claimAndSendQualifyingAnnouncement(client, qualifying) {
   try {
     const channel = await client.channels.fetch(config.channels.announcements);
     if (!channel) throw new Error('Announcement channel not found');
-    await channel.send({ content: '@everyone 🏁 Qualifying Predictions are now LIVE!', embeds: [createQualifyingAnnouncementEmbed(qualifying)] });
+    const button = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`predict_qualifying:${qualifying._id}`).setLabel('Predict Qualifying').setStyle(ButtonStyle.Primary).setEmoji('🏁')
+    );
+    await channel.send({ content: '@everyone 🏁 Qualifying Predictions are now LIVE!', embeds: [createQualifyingAnnouncementEmbed(qualifying)], components: [button] });
   } catch (error) {
     await Qualifying.updateOne({ _id: qualifying._id }, { $set: { announcementSent: false } });
     console.error('Failed to send qualifying announcement:', error);
