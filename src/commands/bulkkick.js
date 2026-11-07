@@ -45,7 +45,7 @@ function reviewText(members, page, reason) {
   const pageMembers = members.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const lines = pageMembers.map((member, index) => `${page * PAGE_SIZE + index + 1}. ${member.user.tag} — \`${member.id}\``);
   return {
-    content: `**Review bulk kick — ${members.length} member(s)** (Page ${page + 1}/${totalPages})\\n\\n${lines.join('\\n')}\\n\\n**Reason:** ${reason}\\nReview every page, then select **Confirm kick** to proceed.`,
+    content: `**Review bulk kick — ${members.length} member(s)** (Page ${page + 1}/${totalPages})\n\n${lines.join('\n')}\n\n**Reason:** ${reason}\nReview every page, then select **Confirm kick** to proceed.`,
     components: [reviewRows(page, totalPages)],
   };
 }
@@ -175,9 +175,9 @@ export default {
           ];
           if (kicked.length) resultLines.push('', '**Kicked members:**', ...kicked);
           if (failed.length) resultLines.push('', '**Failed:**', ...failed);
-          const result = resultLines.join('\\n');
+          const result = resultLines.join('\n');
           await interaction.editReply({
-            content: result.length > 1900 ? `**Bulk kick completed.**\\n✅ Kicked: **${kicked.length}**\\n❌ Failed: **${failed.length}**\\nThe full per-member result was too long to display.` : result,
+            content: result.length > 1900 ? `**Bulk kick completed.**\n✅ Kicked: **${kicked.length}**\n❌ Failed: **${failed.length}**\nThe full per-member result was too long to display.` : result,
             components: [],
           });
           return;
