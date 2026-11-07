@@ -15,8 +15,8 @@ export default {
     if (!interaction.guild.members.me?.permissions.has(PermissionFlagsBits.KickMembers)) return interaction.reply({ content: '❌ I need the Kick Members permission to do this.', ephemeral: true });
 
     const rawIds = interaction.options.getString('user_ids');
-    const ids = [...new Set(rawIds.split(/[\\s,;]+/).map(value => value.trim()).filter(Boolean))];
-    const invalid = ids.filter(id => !/^\\d{17,20}$/.test(id));
+    const ids = [...new Set(rawIds.split(/[\s,;]+/).map(value => value.trim()).filter(Boolean))];
+    const invalid = ids.filter(id => !/^\d{17,20}$/.test(id));
     if (invalid.length) return interaction.reply({ content: '❌ Invalid Discord user IDs: ' + invalid.slice(0, 10).join(', '), ephemeral: true });
     if (!ids.length) return interaction.reply({ content: '❌ Please provide at least one Discord user ID.', ephemeral: true });
     if (ids.length > 25) return interaction.reply({ content: '❌ You can process up to 25 accounts per command. Split the list into smaller batches.', ephemeral: true });
@@ -32,14 +32,14 @@ export default {
         else eligible.push(member);
       } catch { skipped.push(id + ' (not found in this server)'); }
     }
-    if (!eligible.length) return interaction.reply({ content: '❌ No eligible server members were found to kick.\\n' + skipped.join('\\n'), ephemeral: true });
+    if (!eligible.length) return interaction.reply({ content: '❌ No eligible server members were found to kick.\n' + skipped.join('\n'), ephemeral: true });
 
-    const preview = eligible.map(member => '• ' + member.user.tag + ' (' + member.id + ')').join('\\n');
+    const preview = eligible.map(member => '• ' + member.user.tag + ' (' + member.id + ')').join('\n');
     const buttons = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('bulk_kick_confirm').setLabel('Confirm kick ' + eligible.length + ' account(s)').setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId('bulk_kick_cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary),
     );
-    await interaction.reply({ content: '**Review this bulk kick before confirming.**\\n\\n' + preview + '\\n\\n**Reason:** ' + reason + (skipped.length ? '\\n\\n**Skipped:**\\n' + skipped.join('\\n') : '') + '\\n\\nOnly the accounts listed above will be kicked.', components: [buttons], ephemeral: true });
+    await interaction.reply({ content: '**Review this bulk kick before confirming.**\n\n' + preview + '\n\n**Reason:** ' + reason + (skipped.length ? '\n\n**Skipped:**\n' + skipped.join('\n') : '') + '\n\nOnly the accounts listed above will be kicked.', components: [buttons], ephemeral: true });
     const response = await interaction.fetchReply();
     try {
       const confirmation = await response.awaitMessageComponent({ componentType: ComponentType.Button, time: 60000, filter: button => button.user.id === interaction.user.id });
@@ -53,7 +53,7 @@ export default {
           await currentMember.kick(reason); kicked.push(target.user.tag + ' (' + target.id + ')');
         } catch (error) { failed.push(target.user.tag + ' (' + (error?.message || 'kick failed') + ')'); }
       }
-      await confirmation.editReply({ content: '**Bulk kick completed.**\\n✅ Kicked: **' + kicked.length + '**\\n❌ Failed: **' + failed.length + '**' + (kicked.length ? '\\n\\n**Kicked accounts:**\\n' + kicked.join('\\n') : '') + (failed.length ? '\\n\\n**Failed:**\\n' + failed.join('\\n') : ''), components: [] });
+      await confirmation.editReply({ content: '**Bulk kick completed.**\n✅ Kicked: **' + kicked.length + '**\n❌ Failed: **' + failed.length + '**' + (kicked.length ? '\n\n**Kicked accounts:**\n' + kicked.join('\n') : '') + (failed.length ? '\n\n**Failed:**\n' + failed.join('\n') : ''), components: [] });
     } catch (error) {
       if (error?.code === 'InteractionCollectorError') await interaction.editReply({ content: '⌛ Confirmation expired. No accounts were kicked.', components: [] }).catch(() => {});
       else throw error;
