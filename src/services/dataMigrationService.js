@@ -36,6 +36,31 @@ async function runRacePassGuildSafetyMigration() {
   console.log('[Migration] Race Pass records are now guild-safe.');
 }
 
+async function runMembershipPaymentRequestIndexMigration() {
+  const name = 'v6-membership-payment-request-partial-index';
+  if (await SchemaMigration.exists({ name })) return;
+
+  // Older deployments may have created a full unique index. That index treats
+  // null as a value, preventing multiple manually granted memberships.
+  try {
+    await Membership.collection.dropIndex('paymentRequestId_1');
+  } catch (error) {
+    if (error?.codeName !== 'IndexNotFound' && error?.code !== 27) throw error;
+  }
+
+  await Membership.collection.createIndex(
+    { paymentRequestId: 1 },
+    {
+      unique: true,
+      name: 'paymentRequestId_1',
+      partialFilterExpression: { paymentRequestId: { $type: 'string' } },
+    }
+  );
+
+  await SchemaMigration.create({ name });
+  console.log('[Migration] Membership payment request index now ignores null values.');
+}
+
 async function runMembershipGuildSafetyMigration() {
   const name = 'v5-membership-guild-safe-index';
   if (await SchemaMigration.exists({ name })) return;
@@ -57,6 +82,7 @@ async function runMembershipGuildSafetyMigration() {
 
 export async function runDataMigrations() {
   await runMembershipGuildSafetyMigration();
+  await runMembershipPaymentRequestIndexMigration();
   await runRacePassGuildSafetyMigration();
 
   if (await SchemaMigration.exists({ name: migrationName })) {
