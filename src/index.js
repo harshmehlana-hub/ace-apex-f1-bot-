@@ -37,6 +37,7 @@ import announcementCommand from './commands/announcement.js';
 import stickstartCommand from './commands/stickstart.js';
 import stickholdCommand from './commands/stickhold.js';
 import feedbackCommand from './commands/feedback.js';
+import bulkKickCommand from './commands/bulkkick.js';
 import { feedbackStatsCommand } from './services/feedbackService.js';
 import { runDataMigrations } from './services/dataMigrationService.js';
 
@@ -87,6 +88,7 @@ const commands = [
   stickstartCommand,
   stickholdCommand,
   feedbackCommand,
+  bulkKickCommand,
   feedbackStatsCommand,
 ];
 
