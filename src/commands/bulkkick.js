@@ -67,17 +67,17 @@ export default {
     }
 
     if (!eligible.length) {
-      return interaction.reply({ content: '❌ No eligible members were found.\\n' + skipped.join('\\n'), ephemeral: true });
+      return interaction.reply({ content: '❌ No eligible members were found.\n' + skipped.join('\n'), ephemeral: true });
     }
 
-    const preview = eligible.map((member, index) => `${index + 1}. ${member.user.tag} (${member.id})`).join('\\n');
+    const preview = eligible.map((member, index) => `${index + 1}. ${member.user.tag} (${member.id})`).join('\n');
     const buttons = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('bulkkick:confirm').setLabel(`Confirm kick ${eligible.length}`).setStyle(ButtonStyle.Danger),
       new ButtonBuilder().setCustomId('bulkkick:cancel').setLabel('Cancel').setStyle(ButtonStyle.Secondary),
     );
 
     await interaction.reply({
-      content: `**Review bulk kick**\\n\\n${preview}\\n\\n**Reason:** ${reason}${skipped.length ? `\\n\\n**Skipped:**\\n${skipped.join('\\n')}` : ''}\\n\\nConfirm to kick only the eligible members listed above.`,
+      content: `**Review bulk kick**\n\n${preview}\n\n**Reason:** ${reason}${skipped.length ? `\n\n**Skipped:**\n${skipped.join('\n')}` : ''}\n\nConfirm to kick only the eligible members listed above.`,
       components: [buttons],
       ephemeral: true,
     });
@@ -119,9 +119,9 @@ export default {
       ];
       if (kicked.length) lines.push('', '**Kicked members:**', ...kicked);
       if (failed.length) lines.push('', '**Failed:**', ...failed);
-      const result = lines.join('\\n');
+      const result = lines.join('\n');
       await confirmation.editReply({
-        content: result.length <= 1900 ? result : `**Bulk kick completed.**\\n✅ Kicked: **${kicked.length}**\\n❌ Failed: **${failed.length}**\\nThe full member-by-member result exceeded Discord's message limit.`,
+        content: result.length <= 1900 ? result : `**Bulk kick completed.**\n✅ Kicked: **${kicked.length}**\n❌ Failed: **${failed.length}**\nThe full member-by-member result exceeded Discord's message limit.`,
         components: [],
       });
     } catch (error) {
