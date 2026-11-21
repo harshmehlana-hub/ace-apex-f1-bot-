@@ -9,6 +9,7 @@ import { createResultsEmbed } from '../utils/embeds.js';
 import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
+import { publishTopTenLeaderboard } from '../services/leaderboardService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('results').setDescription('Enter official race results').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -88,6 +89,14 @@ export default {
       } catch (error) {
         standingsSynced = false;
         console.error('Race result standings reconciliation failed:', error);
+      }
+
+      if (standingsSynced) {
+        try {
+          await publishTopTenLeaderboard(client, race.season, `${race.name} Race`);
+        } catch (error) {
+          console.error('Failed to publish automatic race leaderboard:', error);
+        }
       }
 
       try {
