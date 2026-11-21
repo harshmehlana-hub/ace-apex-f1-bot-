@@ -1,5 +1,39 @@
 import { SeasonStanding } from '../database/models/SeasonStanding.js';
 import { User } from '../database/models/User.js';
+import { createLeaderboardEmbed } from '../utils/embeds.js';
+
+const LEADERBOARD_CHANNEL_ID = '1482241992309342241';
+
+export async function publishTopTenLeaderboard(client, season, eventLabel) {
+  const standings = await SeasonStanding.find({ season })
+    .sort({ totalPoints: -1, pointsReachedAt: 1, userId: 1 })
+    .limit(10)
+    .lean();
+
+  if (!standings.length) return false;
+
+  const users = await User.find({ discordId: { $in: standings.map(entry => entry.userId) } })
+    .select('discordId username')
+    .lean();
+  const usernames = new Map(users.map(user => [user.discordId, user.username]));
+  const topTen = standings.map(entry => ({
+    ...entry,
+    username: usernames.get(entry.userId) || entry.userId,
+  }));
+
+  const channel = await client.channels.fetch(LEADERBOARD_CHANNEL_ID);
+  if (!channel) throw new Error('Leaderboard channel not found: ' + LEADERBOARD_CHANNEL_ID);
+
+  const embed = createLeaderboardEmbed(topTen, 1, 10, season)
+    .setFooter({ text: 'Updated Top 10 standings' });
+
+  await channel.send({
+    content: '@everyone 📊 Updated standings after ' + eventLabel,
+    embeds: [embed],
+  });
+  return true;
+}
+
 
 export async function getSeasonLeaderboard(season, guild = null) {
   const standings = await SeasonStanding.find({ season })
