@@ -8,6 +8,7 @@ import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { rebuildAllSeasonStandings } from '../services/seasonStandingService.js';
 import { getCurrentSeason } from '../services/seasonService.js';
+import { publishTopTenLeaderboard } from '../services/leaderboardService.js';
 
 export default {
   data: new SlashCommandBuilder().setName('qualifyingresult').setDescription('Enter qualifying results (Admin only)').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -52,10 +53,20 @@ export default {
         if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏁 Qualifying Results are OUT!', embeds: [createQualifyingResultsEmbed(qualifying, { poleDriver }, correctPredictions, predictions.length)] });
       } catch (error) { console.error('Failed to publish qualifying results:', error); }
 
+      let standingsSynced = true;
       try {
         await rebuildAllSeasonStandings(qualifying.season);
       } catch (error) {
+        standingsSynced = false;
         console.error('Qualifying result was processed, but season standings rebuild failed:', error);
+      }
+
+      if (standingsSynced) {
+        try {
+          await publishTopTenLeaderboard(client, qualifying.season, `${qualifying.name} Qualifying`);
+        } catch (error) {
+          console.error('Failed to publish automatic qualifying leaderboard:', error);
+        }
       }
 
       await poleI.editReply({ content: `✅ Results processed successfully!\n\n🏁 ${qualifying.name}\n🏆 Pole Position: ${poleDriver}\n\n🎯 Correct Predictions: ${correctPredictions}\n📊 Total Predictions: ${predictions.length}`, components: [] });
