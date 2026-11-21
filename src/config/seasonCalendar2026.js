@@ -18,18 +18,16 @@ const session = (key, name, qualifying, race, timezone, racePassKey = key) => {
   };
 };
 
-// Official 2026 calendar currently used by F1, including the relocated
-// Bahrain Grand Prix in Malaysia. Times are the published local session times
-// converted to absolute instants with the circuit's UTC offset.
-// Sprint sessions are intentionally not included because this bot predicts
-// the main qualifying and Grand Prix only.
+// 2026 Formula 1 calendar and published main qualifying/race start times.
+// Session timestamps include the circuit's local UTC offset so they remain
+// correct when displayed in other time zones. Sprint sessions are not used
+// by this bot's main qualifying and Grand Prix prediction workflow.
 export const SEASON = '2026';
 
 export const SEASON_CALENDAR_2026 = [
   session('australia', 'Australian Grand Prix', '2026-03-07T16:00:00+11:00', '2026-03-08T15:00:00+11:00', 'Australia/Melbourne'),
   session('china', 'Chinese Grand Prix', '2026-03-14T15:00:00+08:00', '2026-03-15T15:00:00+08:00', 'Asia/Shanghai'),
   session('japan', 'Japanese Grand Prix', '2026-03-28T15:00:00+09:00', '2026-03-29T14:00:00+09:00', 'Asia/Tokyo'),
-  session('saudi-arabia', 'Saudi Arabian Grand Prix', '2026-04-18T20:00:00+03:00', '2026-04-19T20:00:00+03:00', 'Asia/Riyadh'),
   session('miami', 'Miami Grand Prix', '2026-05-02T16:00:00-04:00', '2026-05-03T16:00:00-04:00', 'America/New_York'),
   session('canada', 'Canadian Grand Prix', '2026-05-23T16:00:00-04:00', '2026-05-24T16:00:00-04:00', 'America/Toronto'),
   session('monaco', 'Monaco Grand Prix', '2026-06-06T16:00:00+02:00', '2026-06-07T15:00:00+02:00', 'Europe/Monaco'),
@@ -47,7 +45,7 @@ export const SEASON_CALENDAR_2026 = [
   session('united-states', 'United States Grand Prix', '2026-10-24T16:00:00-05:00', '2026-10-25T15:00:00-05:00', 'America/Chicago'),
   session('mexico', 'Mexico City Grand Prix', '2026-10-31T15:00:00-06:00', '2026-11-01T14:00:00-06:00', 'America/Mexico_City'),
   session('sao-paulo', 'São Paulo Grand Prix', '2026-11-07T15:00:00-03:00', '2026-11-08T14:00:00-03:00', 'America/Sao_Paulo'),
-  session('las-vegas', 'Las Vegas Grand Prix', '2026-11-21T20:00:00-08:00', '2026-11-21T20:00:00-08:00', 'America/Los_Angeles'),
+  session('las-vegas', 'Las Vegas Grand Prix', '2026-11-20T20:00:00-08:00', '2026-11-21T20:00:00-08:00', 'America/Los_Angeles'),
   session('qatar', 'Qatar Grand Prix', '2026-11-28T21:00:00+03:00', '2026-11-29T19:00:00+03:00', 'Asia/Qatar'),
   session('abu-dhabi', 'Abu Dhabi Grand Prix', '2026-12-05T18:00:00+04:00', '2026-12-06T17:00:00+04:00', 'Asia/Dubai'),
 ];
