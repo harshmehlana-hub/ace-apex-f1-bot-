@@ -49,7 +49,7 @@ export function createRankEmbed(user, rank, totalUsers, season = '') {
 export function createResultsEmbed(race, result, topPredictors) {
   const topList = topPredictors.slice(0, 5).map((p, i) => {
     const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
-    return `${medal} <@${p.userId}> — ${p.pointsAwarded} Points`;
+    return `${medal} **${p.username || p.userId}** — ${p.pointsAwarded} Points`;
   }).join('\n');
 
   return new EmbedBuilder()
