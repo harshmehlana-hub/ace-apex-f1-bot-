@@ -10,6 +10,7 @@ import { config } from '../config.js';
 import { isAdmin } from '../utils/validators.js';
 import { getCurrentSeason } from '../services/seasonService.js';
 import { publishTopTenLeaderboard } from '../services/leaderboardService.js';
+import { User } from '../database/models/User.js';
 
 export default {
   data: new SlashCommandBuilder().setName('results').setDescription('Enter official race results').setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
@@ -74,13 +75,27 @@ export default {
       });
 
       const topPredictorIds = scores.slice(0, 5).map(s => s.userId);
+      const storedUsers = await User.find({ discordId: { $in: topPredictorIds } }).select('discordId username').lean();
+      const predictorNames = new Map(storedUsers.map(user => [user.discordId, user.username]));
+      try {
+        const members = await interaction.guild.members.fetch({ user: topPredictorIds, cache: false });
+        const updates = [];
+        for (const [userId, member] of members) {
+          const username = member.user?.username;
+          if (!username) continue;
+          predictorNames.set(userId, username);
+          updates.push({ updateOne: { filter: { discordId: userId }, update: { $set: { username }, $setOnInsert: { discordId: userId } }, upsert: true } });
+        }
+        if (updates.length) await User.bulkWrite(updates, { ordered: false });
+      } catch (error) { console.error('Failed to refresh top predictor usernames:', error); }
+      const scoresWithNames = scores.map(score => ({ ...score, username: predictorNames.get(score.userId) || score.userId }));
 
       // Publish the race result immediately after the scoring transaction commits.
       // Season-standing rebuilds and role reconciliation can be expensive on large servers
       // and should not delay the public results announcement.
       try {
         const resultsChannel = await client.channels.fetch(config.channels.results);
-        if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scores)] });
+        if (resultsChannel) await resultsChannel.send({ content: '@everyone 🏎️ Race Results are OUT!', embeds: [createResultsEmbed(race, { ...resultData }, scoresWithNames)] });
       } catch (error) { console.error('Failed to publish race results:', error); }
 
       let standingsSynced = true;
