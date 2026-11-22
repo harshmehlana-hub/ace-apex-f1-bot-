@@ -17,17 +17,15 @@ export async function auditAdminCommand(interaction, status = 'started', error =
       error: error ? String(error?.message || error).slice(0, 2000) : null,
     });
 
-    // Post one readable entry when an admin starts a slash command.
-    // Do not ping the admin; the mention is displayed without a notification.
+    // Match prediction logs: send Discord mentions as normal message content.
     if (status === 'started' && interaction.client) {
       const channel = await interaction.client.channels.fetch(USAGE_LOG_CHANNEL_ID);
       if (!channel?.isTextBased() || !channel.send) {
         throw new Error('Usage logs channel is not a text channel or is unavailable.');
       }
-      await channel.send({
-        content: `<@${interaction.user.id}> ran the command /${interaction.commandName}`,
-        allowedMentions: { parse: [] },
-      });
+      await channel.send(
+        `<@${interaction.user.id}> ran the command /${interaction.commandName}`
+      );
     }
   } catch (auditError) {
     console.error('Failed to write admin audit log:', auditError);
@@ -41,10 +39,9 @@ export async function logPurchaseButtonClick(interaction) {
       throw new Error('Usage logs channel is not a text channel or is unavailable.');
     }
 
-    await channel.send({
-      content: `🎟️ <@${interaction.user.id}> clicked **Get Race Pass / Membership** in <#${interaction.channelId}>.`,
-      allowedMentions: { parse: [] },
-    });
+    await channel.send(
+      `🎟️ <@${interaction.user.id}> clicked **Get Race Pass / Membership** in <#${interaction.channelId}>.`
+    );
   } catch (error) {
     console.error('Failed to log membership purchase button click:', error);
   }
