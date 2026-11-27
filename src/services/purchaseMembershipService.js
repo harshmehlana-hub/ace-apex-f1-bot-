@@ -107,6 +107,14 @@ export async function handlePurchaseInteraction(interaction, client) {
 
   if (id.startsWith(TYPE_PREFIX + ':')) {
     const [, country, type] = id.split(':');
+    if (type === 'monthly') {
+      await interaction.update({
+        content: '⚠️ Monthly memberships are currently unavailable. We are not accepting new monthly membership purchases at this time. Yearly Memberships and Race Passes are still available.',
+        components: [],
+      });
+      return;
+    }
+
     const payment = membershipPayments[country]?.[type];
     if (!payment) return;
 
