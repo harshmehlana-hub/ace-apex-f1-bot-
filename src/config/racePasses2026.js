@@ -35,7 +35,11 @@ export function getRacePass(key, season = null) {
 }
 
 export function getAvailableRacePasses(now = new Date(), season = String(now.getUTCFullYear())) {
-  return getRacePassesForSeason(season).filter((race) => now >= race.purchaseStartAt && now <= race.purchaseEndAt);
+  return getRacePassesForSeason(season).filter((race) =>
+    race.key !== 'abu-dhabi' &&
+    now >= race.purchaseStartAt &&
+    now <= race.purchaseEndAt
+  );
 }
 
 export const RACE_PASSES_2026 = getRacePassesForSeason('2026');
